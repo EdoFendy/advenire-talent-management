@@ -1,0 +1,7 @@
+{
+  "name": "Advenire Talent Management",
+  "description": "A world-class talent management ERP for Advenire, integrating calendars, rosters, campaigns, and advanced financial tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
