@@ -7,19 +7,24 @@ import { useApp } from '../context/AppContext';
 import { talentsApi } from '../api';
 import * as XLSX from 'xlsx';
 
-// ============== COLUMN DEFINITIONS ==============
+// ============== FIXED COLUMN DEFINITIONS (formato unico, non personalizzabile) ==============
 const TEMPLATE_COLUMNS = [
+  // Dati personali
   { key: 'firstName', label: 'Nome', required: true },
   { key: 'lastName', label: 'Cognome', required: true },
   { key: 'stageName', label: 'Nome d\'arte', required: false },
+  { key: 'display_name', label: 'Nome visualizzato', required: false },
+  { key: 'birthDate', label: 'Data di nascita', required: false },
   { key: 'status', label: 'Stato (active/inactive)', required: false },
   { key: 'phone', label: 'Telefono', required: false },
   { key: 'email', label: 'Email', required: false },
+  // Indirizzo spedizione
   { key: 'address_street', label: 'Indirizzo / Via', required: false },
-  { key: 'address_city', label: 'Città', required: false },
+  { key: 'address_city', label: 'Citta', required: false },
   { key: 'address_zip', label: 'CAP', required: false },
   { key: 'address_country', label: 'Paese', required: false },
-  { key: 'notes', label: 'Note', required: false },
+  { key: 'shippingNotes', label: 'Note spedizione', required: false },
+  // Social
   { key: 'tiktok', label: 'TikTok URL', required: false },
   { key: 'tiktokFollowers', label: 'TikTok Followers', required: false },
   { key: 'instagram', label: 'Instagram URL', required: false },
@@ -27,19 +32,21 @@ const TEMPLATE_COLUMNS = [
   { key: 'youtube_url', label: 'YouTube URL', required: false },
   { key: 'twitch_url', label: 'Twitch URL', required: false },
   { key: 'other_socials', label: 'Altri social', required: false },
-  { key: 'payout_method', label: 'Metodo pagamento', required: false },
+  // Pagamenti
+  { key: 'payout_method', label: 'Metodo pagamento (IBAN/PayPal/Entrambi)', required: false },
   { key: 'iban', label: 'IBAN', required: false },
   { key: 'bank_name', label: 'Nome banca', required: false },
-  { key: 'paypal_email', label: 'Email PayPal', required: false },
+  { key: 'paypal_email', label: 'Email PayPal / Link Revolut', required: false },
   { key: 'vat', label: 'P.IVA', required: false },
   { key: 'fiscal_code', label: 'Codice Fiscale', required: false },
+  // Fatturazione
   { key: 'billing_name', label: 'Intestatario fatturazione', required: false },
-  { key: 'billing_address_street', label: 'Indirizzo fatturazione', required: false },
-  { key: 'billing_address_city', label: 'Città fatturazione', required: false },
+  { key: 'billing_address_street', label: 'Via fatturazione', required: false },
+  { key: 'billing_address_city', label: 'Citta fatturazione', required: false },
   { key: 'billing_address_zip', label: 'CAP fatturazione', required: false },
   { key: 'billing_address_country', label: 'Paese fatturazione', required: false },
-  // Special composite field
-  { key: '_billing_data', label: 'Dati Fatturazione (misto: estrai IBAN/PayPal/P.IVA)', required: false },
+  // Note
+  { key: 'notes', label: 'Note', required: false },
 ];
 
 // ============== BILLING DATA EXTRACTION ==============
@@ -84,11 +91,18 @@ function extractFromBillingData(text: string) {
 
 // ============== TEMPLATE DOWNLOAD ==============
 function downloadTemplate() {
-  const headers = TEMPLATE_COLUMNS.filter(c => c.key !== '_billing_data').map(c => c.label);
-  const exampleRow = ['Mario', 'Rossi', '', 'active', '+39 333 1234567', 'mario.rossi@email.com', 'Via Roma 1', 'Milano', '20100', 'Italia', '', 'https://tiktok.com/@mario', '50000', 'https://instagram.com/mario', '30000', '', '', '', 'IBAN', 'IT60X0542811101000000123456', 'Banca Esempio', '', '12345678901', 'RSSMRA90A01F205X', 'Mario Rossi', 'Via Roma 1', 'Milano', '20100', 'Italia'];
+  const headers = TEMPLATE_COLUMNS.map(c => c.label);
+  const exampleRow = [
+    'Mario', 'Rossi', 'MarioR', 'Mario Rossi', '1990-01-15', 'active', '+39 333 1234567', 'mario.rossi@email.com',
+    'Via Roma 1', 'Milano', '20100', 'Italia', 'Citofono Rossi',
+    'https://tiktok.com/@mario', '50000', 'https://instagram.com/mario', '30000', 'https://youtube.com/@mario', '', '',
+    'Entrambi', 'IT60X0542811101000000123456', 'Banca Esempio', 'https://paypal.me/mariorossi', '12345678901', 'RSSMRA90A01F205X',
+    'Mario Rossi SRL', 'Via Roma 1', 'Milano', '20100', 'Italia',
+    ''
+  ];
 
   const ws = XLSX.utils.aoa_to_sheet([headers, exampleRow]);
-  ws['!cols'] = headers.map(() => ({ wch: 22 }));
+  ws['!cols'] = headers.map(() => ({ wch: 24 }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Template Talenti');
   XLSX.writeFile(wb, 'template_talenti_advenire.xlsx');
@@ -183,7 +197,7 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
   // Step 5: Result
   const [importResult, setImportResult] = useState<any>(null);
 
-  // Step 1: Parse file (XLSX, XLS, or CSV)
+  // Step 1: Parse file (XLSX, XLS, or CSV) - formato fisso, mappatura automatica
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -204,11 +218,50 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
         setHeaders(hdrs);
         setRawData(rows.map(row => row.map(String)));
 
-        // Auto-map
-        const autoMap = autoMapColumns(hdrs);
+        // Mappatura automatica con formato fisso: colonne in ordine TEMPLATE_COLUMNS
+        const autoMap: Record<string, string> = {};
+        // Prova prima la mappatura per posizione (formato fisso)
+        const templateLabels = TEMPLATE_COLUMNS.map(c => c.label.toLowerCase().trim());
+        const fileLabels = hdrs.map(h => h.toLowerCase().trim());
+
+        // Check if file matches fixed template format (by label match)
+        let matchCount = 0;
+        for (let i = 0; i < Math.min(hdrs.length, TEMPLATE_COLUMNS.length); i++) {
+          if (templateLabels[i] && fileLabels[i] && (
+            templateLabels[i] === fileLabels[i] ||
+            templateLabels[i].includes(fileLabels[i]) ||
+            fileLabels[i].includes(templateLabels[i])
+          )) {
+            matchCount++;
+          }
+        }
+
+        // If file matches fixed format (>50% match), use positional mapping
+        if (matchCount >= Math.min(hdrs.length, TEMPLATE_COLUMNS.length) * 0.5) {
+          for (let i = 0; i < Math.min(hdrs.length, TEMPLATE_COLUMNS.length); i++) {
+            autoMap[String(i)] = TEMPLATE_COLUMNS[i].key;
+          }
+        } else {
+          // Fallback: try fuzzy auto-mapping
+          const fallbackMap = autoMapColumns(hdrs);
+          Object.assign(autoMap, fallbackMap);
+        }
+
         setColumnMapping(autoMap);
 
-        setStep(2);
+        // Skip mapping step - go directly to preview (apply mapping immediately)
+        const mappedResult = rows.map(row => {
+          const mapped: Record<string, string> = {};
+          for (const colIdx of Object.keys(autoMap)) {
+            const fieldKey = autoMap[colIdx];
+            if (!fieldKey || fieldKey === '_skip') continue;
+            const cellValue = row[parseInt(colIdx)] || '';
+            mapped[fieldKey] = cellValue;
+          }
+          return mapped;
+        });
+        setMappedRows(mappedResult);
+        setStep(3); // Go directly to preview
       } catch (err) {
         console.error('Errore parsing file:', err);
       }
@@ -304,7 +357,8 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
     URL.revokeObjectURL(url);
   };
 
-  const stepTitles = ['Carica File', 'Mappa Colonne', 'Anteprima', 'Validazione', 'Risultato'];
+  const stepTitles = ['Carica File', '', 'Anteprima', 'Validazione', 'Risultato'];
+  const visibleSteps = [{ num: 1, label: 'Carica File' }, { num: 3, label: 'Anteprima' }, { num: 4, label: 'Validazione' }, { num: 5, label: 'Risultato' }];
   const mappedCount = Object.values(columnMapping).filter(v => v && v !== '_skip').length;
 
   return (
@@ -322,7 +376,10 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
           <div>
             <h3 className="text-lg font-black text-white uppercase tracking-tight">Importa Talenti</h3>
             <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
-              Step {step} di 5 — {stepTitles[step - 1]}
+              {step === 1 ? 'Step 1 di 4 — Carica File' :
+               step === 3 ? 'Step 2 di 4 — Anteprima' :
+               step === 4 ? 'Step 3 di 4 — Validazione' :
+               'Step 4 di 4 — Risultato'}
             </p>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
@@ -332,17 +389,17 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
 
         {/* Step indicators */}
         <div className="px-6 pt-4 flex items-center gap-2 flex-shrink-0">
-          {stepTitles.map((_, idx) => (
-            <div key={idx} className="flex items-center flex-1">
+          {visibleSteps.map((vs, idx) => (
+            <div key={vs.num} className="flex items-center flex-1">
               <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ${
-                idx + 1 < step ? 'bg-emerald-500/20 text-emerald-400' :
-                idx + 1 === step ? 'bg-blue-600 text-white' :
+                vs.num < step ? 'bg-emerald-500/20 text-emerald-400' :
+                vs.num === step ? 'bg-blue-600 text-white' :
                 'bg-zinc-900 text-zinc-600'
               }`}>
-                {idx + 1 < step ? <Check size={12} /> : idx + 1}
+                {vs.num < step ? <Check size={12} /> : idx + 1}
               </div>
-              {idx < stepTitles.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-1 ${idx + 1 < step ? 'bg-emerald-500/30' : 'bg-zinc-800'}`} />
+              {idx < visibleSteps.length - 1 && (
+                <div className={`flex-1 h-0.5 mx-1 ${vs.num < step ? 'bg-emerald-500/30' : 'bg-zinc-800'}`} />
               )}
             </div>
           ))}
@@ -359,7 +416,7 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
               <div>
                 <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Carica il file</h4>
                 <p className="text-xs text-zinc-500 max-w-md mx-auto">
-                  Supportati: <strong className="text-zinc-300">.xlsx, .xls, .csv</strong> — anche con colonne incomplete o in ordine diverso. Nella prossima schermata potrai mappare le colonne manualmente.
+                  Supportati: <strong className="text-zinc-300">.xlsx, .xls, .csv</strong> — il file deve seguire il <strong className="text-zinc-300">formato fisso del template</strong>. Scarica il template per avere tutte le colonne nell'ordine corretto. I campi vuoti verranno importati come vuoti e saranno sempre modificabili.
                 </p>
               </div>
               <div className="flex items-center justify-center gap-3">
@@ -380,97 +437,14 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
             </div>
           )}
 
-          {/* STEP 2: Column Mapping */}
-          {step === 2 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-xs text-zinc-400">
-                  {headers.length} colonne trovate, {mappedCount} mappate automaticamente.
-                  Associa le colonne mancanti o ignora quelle non necessarie.
-                </p>
-              </div>
-              <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                {headers.map((header, idx) => {
-                  const currentMapping = columnMapping[String(idx)];
-                  const isMapped = currentMapping && currentMapping !== '_skip';
-                  return (
-                    <div key={idx} className={`flex items-center gap-3 rounded-xl p-3 border transition-all ${
-                      isMapped ? 'bg-emerald-500/5 border-emerald-500/10' : 'bg-zinc-900/50 border-white/5'
-                    }`}>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-bold text-white truncate">{header}</p>
-                        <p className="text-[10px] text-zinc-600 truncate">
-                          Es: {rawData[0]?.[idx] ? String(rawData[0][idx]).substring(0, 60) : '—'}
-                          {rawData[0]?.[idx] && String(rawData[0][idx]).length > 60 ? '...' : ''}
-                        </p>
-                      </div>
-                      <ChevronRight size={14} className={`flex-shrink-0 ${isMapped ? 'text-emerald-500' : 'text-zinc-600'}`} />
-                      <select
-                        value={currentMapping || '_skip'}
-                        onChange={e => setColumnMapping(prev => ({ ...prev, [String(idx)]: e.target.value }))}
-                        className="bg-zinc-800 border border-white/10 rounded-lg px-3 py-2 text-xs text-white font-bold w-64 focus:outline-none focus:border-blue-500/50"
-                      >
-                        <option value="_skip">— Ignora colonna —</option>
-                        <optgroup label="Campi principali">
-                          {TEMPLATE_COLUMNS.filter(c => ['firstName','lastName','stageName','status','phone','email'].includes(c.key)).map(col => (
-                            <option key={col.key} value={col.key}>{col.label} {col.required ? '*' : ''}</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Indirizzo">
-                          {TEMPLATE_COLUMNS.filter(c => c.key.startsWith('address_')).map(col => (
-                            <option key={col.key} value={col.key}>{col.label}</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Social">
-                          {TEMPLATE_COLUMNS.filter(c => ['tiktok','tiktokFollowers','instagram','instagramFollowers','youtube_url','twitch_url','other_socials'].includes(c.key)).map(col => (
-                            <option key={col.key} value={col.key}>{col.label}</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Pagamenti e fatturazione">
-                          {TEMPLATE_COLUMNS.filter(c => ['payout_method','iban','bank_name','paypal_email','vat','fiscal_code','billing_name'].includes(c.key)).map(col => (
-                            <option key={col.key} value={col.key}>{col.label}</option>
-                          ))}
-                          {TEMPLATE_COLUMNS.filter(c => c.key.startsWith('billing_address_')).map(col => (
-                            <option key={col.key} value={col.key}>{col.label}</option>
-                          ))}
-                        </optgroup>
-                        <optgroup label="Speciali">
-                          <option value="_billing_data">Dati Fatturazione (misto: estrai IBAN/PayPal/P.IVA)</option>
-                          <option value="notes">Note</option>
-                        </optgroup>
-                      </select>
-                    </div>
-                  );
-                })}
-              </div>
-
-              {/* Warnings */}
-              {!Object.values(columnMapping).includes('firstName') && (
-                <div className="flex items-center gap-2 text-amber-400 text-xs font-bold bg-amber-500/10 p-3 rounded-xl">
-                  <AlertTriangle size={14} /> La colonna "Nome" non è mappata (obbligatoria)
-                </div>
-              )}
-              {!Object.values(columnMapping).includes('lastName') && (
-                <div className="flex items-center gap-2 text-amber-400 text-xs font-bold bg-amber-500/10 p-3 rounded-xl">
-                  <AlertTriangle size={14} /> La colonna "Cognome" non è mappata (obbligatoria)
-                </div>
-              )}
-              {Object.values(columnMapping).includes('_billing_data') && (
-                <div className="flex items-center gap-2 text-blue-400 text-xs font-bold bg-blue-500/10 p-3 rounded-xl">
-                  <CheckCircle size={14} /> IBAN, PayPal e P.IVA saranno estratti automaticamente dal campo "Dati Fatturazione"
-                </div>
-              )}
-            </div>
-          )}
+          {/* STEP 2: Skipped - column mapping is automatic with fixed format */}
 
           {/* STEP 3: Preview */}
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-xs text-zinc-400">
-                Anteprima dei dati mappati: <strong className="text-white">{mappedRows.length}</strong> righe trovate.
-                {Object.values(columnMapping).includes('_billing_data') && (
-                  <span className="text-blue-400"> IBAN/PayPal/P.IVA estratti automaticamente.</span>
-                )}
+                Anteprima dei dati: <strong className="text-white">{mappedRows.length}</strong> righe trovate.
+                I campi vuoti verranno importati come vuoti e saranno modificabili dal profilo del talent.
               </p>
               <div className="overflow-x-auto rounded-xl border border-white/5">
                 <table className="w-full text-left">
@@ -482,7 +456,10 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                       <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Email</th>
                       <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Telefono</th>
                       <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">IBAN</th>
+                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">PayPal</th>
                       <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Metodo</th>
+                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">P.IVA</th>
+                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">C.F.</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -491,14 +468,17 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                         <td className="p-2 text-[10px] text-zinc-600 font-bold">{idx + 1}</td>
                         <td className="p-2 text-xs text-white font-bold">{row.firstName || <span className="text-red-400">—</span>}</td>
                         <td className="p-2 text-xs text-white font-bold">{row.lastName || <span className="text-red-400">—</span>}</td>
-                        <td className="p-2 text-xs text-zinc-400">{row.email || '—'}</td>
-                        <td className="p-2 text-xs text-zinc-400">{row.phone || '—'}</td>
-                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.iban ? row.iban.substring(0, 10) + '...' : '—'}</td>
+                        <td className="p-2 text-xs text-zinc-400">{row.email || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-zinc-400">{row.phone || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.iban ? row.iban.substring(0, 12) + '...' : <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-zinc-400">{row.paypal_email ? 'Si' : <span className="text-zinc-700">vuoto</span>}</td>
                         <td className="p-2">
                           {row.payout_method ? (
                             <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">{row.payout_method}</span>
-                          ) : <span className="text-xs text-zinc-600">—</span>}
+                          ) : <span className="text-xs text-zinc-700">vuoto</span>}
                         </td>
+                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.vat || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.fiscal_code || <span className="text-zinc-700">vuoto</span>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -623,6 +603,41 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                     )}
                   </div>
 
+                  {importResult?.credentials && importResult.credentials.length > 0 && (
+                    <div className="text-left bg-zinc-900/50 rounded-xl p-4 border border-emerald-500/10 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Credenziali Generate</p>
+                        <button
+                          onClick={() => {
+                            const csvRows = [['Nome', 'Email', 'Password']];
+                            importResult.credentials.forEach((c: any) => csvRows.push([c.name, c.email, c.password]));
+                            const csvContent = csvRows.map((r: string[]) => r.map(c => `"${c}"`).join(',')).join('\n');
+                            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = 'credenziali_talenti.csv';
+                            link.click();
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="flex items-center gap-1.5 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-white transition-all"
+                        >
+                          <Download size={11} /> Scarica CSV
+                        </button>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-2">
+                        {importResult.credentials.map((cred: any, i: number) => (
+                          <div key={i} className="flex items-center gap-4 bg-zinc-800/50 rounded-lg px-3 py-2 border border-white/5">
+                            <span className="text-xs font-bold text-white flex-1 truncate">{cred.name}</span>
+                            <span className="text-xs text-zinc-400 truncate max-w-[180px]">{cred.email}</span>
+                            <span className="text-xs text-emerald-400 font-mono font-bold select-all">{cred.password}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[9px] text-zinc-600 font-bold">Salva o condividi queste credenziali — i talent potranno cambiarle dal proprio profilo.</p>
+                    </div>
+                  )}
+
                   {importResult?.errors && importResult.errors.length > 0 && (
                     <div className="text-left bg-zinc-900/50 rounded-xl p-4 border border-white/5 max-h-40 overflow-y-auto">
                       <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Errori dal server:</p>
@@ -640,9 +655,17 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
         {/* Footer with navigation */}
         <div className="p-6 border-t border-white/5 flex items-center justify-between flex-shrink-0">
           <div>
-            {step > 1 && step < 5 && (
+            {step === 3 && (
               <button
-                onClick={() => setStep(s => s - 1)}
+                onClick={() => setStep(1)}
+                className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
+              >
+                <ChevronLeft size={14} /> Carica altro file
+              </button>
+            )}
+            {step === 4 && (
+              <button
+                onClick={() => setStep(3)}
                 className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
               >
                 <ChevronLeft size={14} /> Indietro
@@ -657,14 +680,6 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                 className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20"
               >
                 Chiudi
-              </button>
-            ) : step === 2 ? (
-              <button
-                onClick={applyMapping}
-                disabled={!Object.values(columnMapping).includes('firstName') || !Object.values(columnMapping).includes('lastName')}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-30 disabled:cursor-not-allowed text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20"
-              >
-                Anteprima <ChevronRight size={14} />
               </button>
             ) : step === 3 ? (
               <button

@@ -48,6 +48,12 @@ export const talentsApi = {
     getCredentials: (id: string) =>
         apiRequest<{ username: string, email: string, password: string }>(`/talents/${id}/credentials`),
 
+    changePassword: (id: string, newPassword: string) =>
+        apiRequest<{ success: boolean }>(`/talents/${id}/credentials`, {
+            method: 'PUT',
+            body: JSON.stringify({ newPassword }),
+        }),
+
     getFinance: (id: string) =>
         apiRequest<any>(`/talents/${id}/finance`),
 

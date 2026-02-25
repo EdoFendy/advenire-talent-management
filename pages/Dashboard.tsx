@@ -3,17 +3,18 @@ import React, { useState, useMemo, useCallback } from 'react';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
   addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, addDays,
-  isToday as isDateToday, isBefore, startOfDay, parseISO
+  isToday as isDateToday, isBefore, startOfDay, parseISO, isWithinInterval
 } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
   ChevronLeft, ChevronRight, Plus, Check, Trash2, X,
   AlertTriangle, Clock, Calendar as CalendarIcon, Flag,
-  StickyNote, GripVertical, Pencil
+  StickyNote, GripVertical, Pencil, Maximize2, Minimize2,
+  Briefcase, Camera, Video, MessageSquare, Truck, Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
-import { Task, TaskStatus, TaskPriority } from '../types';
+import { Task, TaskStatus, TaskPriority, Campaign, Appointment, AppointmentType } from '../types';
 
 const PRIORITY_LABELS: Record<string, string> = {
   low: 'Bassa',
@@ -282,6 +283,23 @@ const TaskSection: React.FC<{
   );
 };
 
+// Calendar event type for unified display
+interface CalendarEvent {
+  id: string;
+  title: string;
+  type: 'task' | 'campaign' | 'appointment';
+  date: string;
+  color: string;
+  priority?: string;
+  status?: string;
+  campaignType?: string;
+  appointmentType?: string;
+  description?: string;
+  isStart?: boolean;
+  isEnd?: boolean;
+  isOngoing?: boolean;
+}
+
 // Main Dashboard component
 interface DashboardProps {
   appointments: any[];
@@ -290,7 +308,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = () => {
-  const { tasks, addTask, updateTask, deleteTask, homeNote, updateHomeNote } = useApp();
+  const { tasks, addTask, updateTask, deleteTask, homeNote, updateHomeNote, campaigns, appointments } = useApp();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -299,11 +317,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
   const [noteText, setNoteText] = useState(homeNote?.note_text || '');
   const [noteEditing, setNoteEditing] = useState(false);
   const [urgentSubTab, setUrgentSubTab] = useState<'urgent' | 'week'>('urgent');
+  const [calendarExpanded, setCalendarExpanded] = useState(false);
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(null);
 
   // Calendar filter state
   const [calendarFilters, setCalendarFilters] = useState({
     status: 'ALL',
-    priority: 'ALL'
+    priority: 'ALL',
+    eventType: 'ALL' // 'ALL' | 'task' | 'campaign' | 'appointment'
   });
 
   // Sync note text when homeNote updates
@@ -346,14 +367,111 @@ const Dashboard: React.FC<DashboardProps> = () => {
     [activeTasks, today, nextWeekEnd]
   );
 
-  // Calendar tasks (all, for dot display)
-  const calendarFilteredTasks = useMemo(() => {
-    return tasks.filter(t => {
-      if (calendarFilters.status !== 'ALL' && t.status !== calendarFilters.status) return false;
-      if (calendarFilters.priority !== 'ALL' && t.priority !== calendarFilters.priority) return false;
-      return true;
-    });
-  }, [tasks, calendarFilters]);
+  // Calendar events: combine tasks, campaigns, and appointments
+  const calendarEvents = useMemo(() => {
+    const events: CalendarEvent[] = [];
+
+    // Tasks
+    if (calendarFilters.eventType === 'ALL' || calendarFilters.eventType === 'task') {
+      tasks.forEach(t => {
+        if (calendarFilters.status !== 'ALL' && t.status !== calendarFilters.status) return;
+        if (calendarFilters.priority !== 'ALL' && t.priority !== calendarFilters.priority) return;
+        if (!t.due_date) return;
+        events.push({
+          id: `task-${t.id}`,
+          title: t.title,
+          type: 'task',
+          date: t.due_date,
+          color: t.priority === 'urgent' ? 'bg-red-400' : t.priority === 'high' ? 'bg-amber-400' : t.status === 'done' ? 'bg-emerald-500' : 'bg-blue-400',
+          priority: t.priority,
+          status: t.status,
+          description: t.description,
+        });
+      });
+    }
+
+    // Campaigns (show start and end dates + ongoing range)
+    if (calendarFilters.eventType === 'ALL' || calendarFilters.eventType === 'campaign') {
+      campaigns.forEach(c => {
+        if (c.data_inizio) {
+          events.push({
+            id: `camp-start-${c.id}`,
+            title: `${c.name}`,
+            type: 'campaign',
+            date: c.data_inizio,
+            color: 'bg-purple-500',
+            campaignType: c.tipo,
+            status: c.status,
+            isStart: true,
+            description: `Inizio campagna${c.brand ? ` - ${c.brand}` : ''}`,
+          });
+        }
+        if (c.data_fine) {
+          events.push({
+            id: `camp-end-${c.id}`,
+            title: `${c.name}`,
+            type: 'campaign',
+            date: c.data_fine,
+            color: 'bg-purple-500',
+            campaignType: c.tipo,
+            status: c.status,
+            isEnd: true,
+            description: `Fine campagna${c.brand ? ` - ${c.brand}` : ''}`,
+          });
+        }
+        if (c.deadline) {
+          events.push({
+            id: `camp-deadline-${c.id}`,
+            title: `Deadline: ${c.name}`,
+            type: 'campaign',
+            date: c.deadline,
+            color: 'bg-red-500',
+            campaignType: c.tipo,
+            status: c.status,
+            description: `Deadline campagna${c.brand ? ` - ${c.brand}` : ''}`,
+          });
+        }
+      });
+    }
+
+    // Appointments
+    if (calendarFilters.eventType === 'ALL' || calendarFilters.eventType === 'appointment') {
+      appointments.forEach(a => {
+        if (!a.date) return;
+        events.push({
+          id: `app-${a.id}`,
+          title: `${a.type}: ${a.brand || a.talentName}`,
+          type: 'appointment',
+          date: a.date,
+          color: a.type === AppointmentType.SHOOTING ? 'bg-cyan-400' :
+                 a.type === AppointmentType.PUBLICATION ? 'bg-pink-400' :
+                 a.type === AppointmentType.CALL ? 'bg-amber-400' :
+                 a.type === AppointmentType.DELIVERY ? 'bg-emerald-400' : 'bg-zinc-400',
+          appointmentType: a.type,
+          status: a.status,
+          description: a.description || `${a.type}${a.location ? ` @ ${a.location}` : ''}`,
+        });
+        if (a.deadline) {
+          events.push({
+            id: `app-deadline-${a.id}`,
+            title: `Deadline: ${a.brand || a.talentName}`,
+            type: 'appointment',
+            date: a.deadline,
+            color: 'bg-red-400',
+            appointmentType: a.type,
+            description: `Scadenza ${a.type}`,
+          });
+        }
+      });
+    }
+
+    return events;
+  }, [tasks, campaigns, appointments, calendarFilters]);
+
+  // Get events for a specific day
+  const getEventsForDay = useCallback((dateStr: string) => {
+    return calendarEvents.filter(e => e.date === dateStr);
+  }, [calendarEvents]);
 
   // Calendar days
   const calendarDays = useMemo(() => {
@@ -400,9 +518,14 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
   const handleCalendarDayClick = useCallback((day: Date) => {
     const dateStr = format(day, 'yyyy-MM-dd');
-    setNewTaskDefaults({ date: dateStr });
-    setShowNewTaskModal(true);
-  }, []);
+    const dayEvents = getEventsForDay(dateStr);
+    if (dayEvents.length > 0) {
+      setSelectedCalendarDay(day);
+    } else {
+      setNewTaskDefaults({ date: dateStr });
+      setShowNewTaskModal(true);
+    }
+  }, [getEventsForDay]);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
@@ -423,155 +546,177 @@ const Dashboard: React.FC<DashboardProps> = () => {
         </button>
       </div>
 
-      {/* 2-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6">
-        {/* LEFT: 4 task sections */}
-        <div className="space-y-4">
-          {/* OGGI */}
-          <TaskSection
-            title="Oggi"
-            icon={<CalendarIcon size={16} />}
-            tasks={todayTasks}
-            emptyMessage="Nessuna attivita per oggi"
-            onQuickAdd={(title) => handleQuickAdd(title, today)}
-            onToggleTask={handleToggleTask}
-            onClickTask={(t) => setSelectedTask(t)}
-            accentColor="text-blue-500"
-          />
+      {/* Layout: expands when calendar is expanded */}
+      <div className={`grid grid-cols-1 gap-6 ${calendarExpanded ? '' : 'lg:grid-cols-[1fr_420px]'}`}>
 
-          {/* DOMANI */}
-          <TaskSection
-            title="Domani"
-            icon={<Clock size={16} />}
-            tasks={tomorrowTasks}
-            emptyMessage="Nessuna attivita per domani"
-            onQuickAdd={(title) => handleQuickAdd(title, tomorrow)}
-            onToggleTask={handleToggleTask}
-            onClickTask={(t) => setSelectedTask(t)}
-            accentColor="text-emerald-500"
-          />
+        {/* LEFT: 4 task sections (hidden when calendar is expanded) */}
+        {!calendarExpanded && (
+          <div className="space-y-4">
+            {/* OGGI */}
+            <TaskSection
+              title="Oggi"
+              icon={<CalendarIcon size={16} />}
+              tasks={todayTasks}
+              emptyMessage="Nessuna attivita per oggi"
+              onQuickAdd={(title) => handleQuickAdd(title, today)}
+              onToggleTask={handleToggleTask}
+              onClickTask={(t) => setSelectedTask(t)}
+              accentColor="text-blue-500"
+            />
 
-          {/* DOPODOMANI */}
-          <TaskSection
-            title="Dopodomani"
-            icon={<Clock size={16} />}
-            tasks={dayAfterTomorrowTasks}
-            emptyMessage="Nessuna attivita per dopodomani"
-            onQuickAdd={(title) => handleQuickAdd(title, dayAfterTomorrow)}
-            onToggleTask={handleToggleTask}
-            onClickTask={(t) => setSelectedTask(t)}
-            accentColor="text-purple-500"
-          />
+            {/* DOMANI */}
+            <TaskSection
+              title="Domani"
+              icon={<Clock size={16} />}
+              tasks={tomorrowTasks}
+              emptyMessage="Nessuna attivita per domani"
+              onQuickAdd={(title) => handleQuickAdd(title, tomorrow)}
+              onToggleTask={handleToggleTask}
+              onClickTask={(t) => setSelectedTask(t)}
+              accentColor="text-emerald-500"
+            />
 
-          {/* URGENZE & PROSSIMA SETTIMANA */}
-          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4">
-            <div className="flex items-center gap-2 mb-3">
-              <AlertTriangle size={16} className="text-red-400" />
-              <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Urgenze & Prossima Settimana</h3>
-            </div>
+            {/* DOPODOMANI */}
+            <TaskSection
+              title="Dopodomani"
+              icon={<Clock size={16} />}
+              tasks={dayAfterTomorrowTasks}
+              emptyMessage="Nessuna attivita per dopodomani"
+              onQuickAdd={(title) => handleQuickAdd(title, dayAfterTomorrow)}
+              onToggleTask={handleToggleTask}
+              onClickTask={(t) => setSelectedTask(t)}
+              accentColor="text-purple-500"
+            />
 
-            {/* Sub-tabs */}
-            <div className="flex gap-1 mb-3 bg-zinc-900/50 p-1 rounded-xl">
-              <button
-                onClick={() => setUrgentSubTab('urgent')}
-                className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  urgentSubTab === 'urgent' ? 'bg-red-500/20 text-red-400' : 'text-zinc-600 hover:text-zinc-400'
-                }`}
-              >
-                Urgenti / Scadute ({urgentTasks.length})
-              </button>
-              <button
-                onClick={() => setUrgentSubTab('week')}
-                className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                  urgentSubTab === 'week' ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-600 hover:text-zinc-400'
-                }`}
-              >
-                Prossimi 7 Giorni ({nextWeekTasks.length})
-              </button>
-            </div>
+            {/* URGENZE & PROSSIMA SETTIMANA */}
+            <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle size={16} className="text-red-400" />
+                <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Urgenze & Prossima Settimana</h3>
+              </div>
 
-            <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar">
-              {urgentSubTab === 'urgent' ? (
-                urgentTasks.length === 0 ? (
-                  <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna urgenza</p>
+              {/* Sub-tabs */}
+              <div className="flex gap-1 mb-3 bg-zinc-900/50 p-1 rounded-xl">
+                <button
+                  onClick={() => setUrgentSubTab('urgent')}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    urgentSubTab === 'urgent' ? 'bg-red-500/20 text-red-400' : 'text-zinc-600 hover:text-zinc-400'
+                  }`}
+                >
+                  Urgenti / Scadute ({urgentTasks.length})
+                </button>
+                <button
+                  onClick={() => setUrgentSubTab('week')}
+                  className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                    urgentSubTab === 'week' ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-600 hover:text-zinc-400'
+                  }`}
+                >
+                  Prossimi 7 Giorni ({nextWeekTasks.length})
+                </button>
+              </div>
+
+              <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar">
+                {urgentSubTab === 'urgent' ? (
+                  urgentTasks.length === 0 ? (
+                    <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna urgenza</p>
+                  ) : (
+                    urgentTasks.map(task => (
+                      <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                    ))
+                  )
                 ) : (
-                  urgentTasks.map(task => (
-                    <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
-                  ))
-                )
-              ) : (
-                nextWeekTasks.length === 0 ? (
-                  <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna attivita nei prossimi 7 giorni</p>
-                ) : (
-                  nextWeekTasks.map(task => (
-                    <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
-                  ))
-                )
-              )}
-            </div>
-
-            <QuickAdd onAdd={(title) => handleQuickAdd(title, today, TaskPriority.URGENT)} />
-
-            {/* NOTE FISSATE */}
-            <div className="mt-4 pt-4 border-t border-white/5">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <StickyNote size={14} className="text-amber-400" />
-                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Note Fissate</span>
-                </div>
-                {!noteEditing ? (
-                  <button onClick={() => setNoteEditing(true)} className="p-1.5 hover:bg-zinc-900 rounded-lg transition-all">
-                    <Pencil size={12} className="text-zinc-600" />
-                  </button>
-                ) : (
-                  <button onClick={handleSaveNote} className="text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest">
-                    Salva
-                  </button>
+                  nextWeekTasks.length === 0 ? (
+                    <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna attivita nei prossimi 7 giorni</p>
+                  ) : (
+                    nextWeekTasks.map(task => (
+                      <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                    ))
+                  )
                 )}
               </div>
-              {noteEditing ? (
-                <textarea
-                  value={noteText}
-                  onChange={e => setNoteText(e.target.value)}
-                  placeholder="Scrivi le tue note qui..."
-                  rows={4}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-700 focus:border-amber-500/50 focus:outline-none resize-none"
-                  autoFocus
-                />
-              ) : (
-                <div
-                  onClick={() => setNoteEditing(true)}
-                  className="min-h-[60px] bg-zinc-900/30 rounded-xl px-3 py-2 text-xs text-zinc-400 cursor-pointer hover:bg-zinc-900/50 transition-all whitespace-pre-wrap"
-                >
-                  {noteText || <span className="italic text-zinc-700">Clicca per aggiungere note...</span>}
+
+              <QuickAdd onAdd={(title) => handleQuickAdd(title, today, TaskPriority.URGENT)} />
+
+              {/* NOTE FISSATE */}
+              <div className="mt-4 pt-4 border-t border-white/5">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <StickyNote size={14} className="text-amber-400" />
+                    <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Note Fissate</span>
+                  </div>
+                  {!noteEditing ? (
+                    <button onClick={() => setNoteEditing(true)} className="p-1.5 hover:bg-zinc-900 rounded-lg transition-all">
+                      <Pencil size={12} className="text-zinc-600" />
+                    </button>
+                  ) : (
+                    <button onClick={handleSaveNote} className="text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest">
+                      Salva
+                    </button>
+                  )}
                 </div>
-              )}
+                {noteEditing ? (
+                  <textarea
+                    value={noteText}
+                    onChange={e => setNoteText(e.target.value)}
+                    placeholder="Scrivi le tue note qui..."
+                    rows={4}
+                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-700 focus:border-amber-500/50 focus:outline-none resize-none"
+                    autoFocus
+                  />
+                ) : (
+                  <div
+                    onClick={() => setNoteEditing(true)}
+                    className="min-h-[60px] bg-zinc-900/30 rounded-xl px-3 py-2 text-xs text-zinc-400 cursor-pointer hover:bg-zinc-900/50 transition-all whitespace-pre-wrap"
+                  >
+                    {noteText || <span className="italic text-zinc-700">Clicca per aggiungere note...</span>}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* RIGHT: Calendar */}
-        <div className="space-y-4">
-          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4 sticky top-28">
+        {/* RIGHT: Calendar (expandable) */}
+        <div className={`space-y-4 ${calendarExpanded ? 'col-span-full' : ''}`}>
+          <div className={`bg-[#0c0c0c] border border-white/5 rounded-2xl p-4 ${calendarExpanded ? '' : 'sticky top-28'}`}>
             {/* Calendar header */}
             <div className="flex items-center justify-between mb-4">
-              <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-xs font-black text-white uppercase tracking-widest">
-                {format(currentMonth, 'MMMM yyyy', { locale: it })}
-              </span>
-              <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-                <ChevronRight size={16} />
+              <div className="flex items-center gap-2">
+                <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+                  <ChevronLeft size={16} />
+                </button>
+                <span className="text-xs font-black text-white uppercase tracking-widest">
+                  {format(currentMonth, 'MMMM yyyy', { locale: it })}
+                </span>
+                <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+              <button
+                onClick={() => setCalendarExpanded(!calendarExpanded)}
+                className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all"
+                title={calendarExpanded ? 'Comprimi calendario' : 'Espandi calendario'}
+              >
+                {calendarExpanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
             </div>
 
             {/* Filters row */}
-            <div className="flex gap-2 mb-3">
+            <div className="flex gap-2 mb-3 flex-wrap">
+              <select
+                value={calendarFilters.eventType}
+                onChange={e => setCalendarFilters(p => ({ ...p, eventType: e.target.value }))}
+                className="flex-1 min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
+              >
+                <option value="ALL">Tutto</option>
+                <option value="task">Solo Attivita</option>
+                <option value="campaign">Solo Campagne</option>
+                <option value="appointment">Solo Appuntamenti</option>
+              </select>
               <select
                 value={calendarFilters.status}
                 onChange={e => setCalendarFilters(p => ({ ...p, status: e.target.value }))}
-                className="flex-1 bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
+                className="flex-1 min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
               >
                 <option value="ALL">Tutti gli stati</option>
                 <option value="todo">Da fare</option>
@@ -581,7 +726,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
               <select
                 value={calendarFilters.priority}
                 onChange={e => setCalendarFilters(p => ({ ...p, priority: e.target.value }))}
-                className="flex-1 bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
+                className="flex-1 min-w-[120px] bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
               >
                 <option value="ALL">Tutte le priorita</option>
                 <option value="low">Bassa</option>
@@ -602,40 +747,76 @@ const Dashboard: React.FC<DashboardProps> = () => {
             <div className="grid grid-cols-7">
               {calendarDays.map((day, idx) => {
                 const dateStr = format(day, 'yyyy-MM-dd');
-                const dayTasks = calendarFilteredTasks.filter(t => t.due_date === dateStr);
+                const dayEvents = getEventsForDay(dateStr);
                 const isToday = isDateToday(day);
                 const inMonth = isSameMonth(day, currentMonth);
+
+                // Check if any campaign is ongoing through this day
+                const ongoingCampaigns = (calendarFilters.eventType === 'ALL' || calendarFilters.eventType === 'campaign')
+                  ? campaigns.filter(c => {
+                      if (!c.data_inizio || !c.data_fine) return false;
+                      try {
+                        return isWithinInterval(day, { start: parseISO(c.data_inizio), end: parseISO(c.data_fine) });
+                      } catch { return false; }
+                    })
+                  : [];
+
+                const hasOngoing = ongoingCampaigns.length > 0 && inMonth;
 
                 return (
                   <div
                     key={idx}
                     onClick={() => handleCalendarDayClick(day)}
-                    className={`relative p-1.5 text-center cursor-pointer rounded-lg transition-all hover:bg-zinc-900/50 ${
+                    className={`relative cursor-pointer rounded-lg transition-all hover:bg-zinc-900/50 ${
                       !inMonth ? 'opacity-20' : ''
+                    } ${hasOngoing ? 'bg-purple-500/[0.04]' : ''} ${
+                      calendarExpanded ? 'min-h-[100px] p-2 border-r border-b border-white/5' : 'p-1.5 text-center'
                     }`}
                   >
-                    <span className={`text-[11px] font-black w-7 h-7 flex items-center justify-center mx-auto rounded-lg ${
-                      isToday ? 'bg-blue-600 text-white' : 'text-zinc-400'
-                    }`}>
-                      {format(day, 'd')}
-                    </span>
+                    <div className={calendarExpanded ? 'flex justify-between items-center mb-1' : ''}>
+                      <span className={`text-[11px] font-black flex items-center justify-center rounded-lg ${
+                        calendarExpanded ? 'w-7 h-7' : 'w-7 h-7 mx-auto'
+                      } ${
+                        isToday ? 'bg-blue-600 text-white' : 'text-zinc-400'
+                      }`}>
+                        {format(day, 'd')}
+                      </span>
+                      {calendarExpanded && dayEvents.length > 0 && inMonth && (
+                        <span className="text-[8px] text-zinc-600 font-bold">{dayEvents.length}</span>
+                      )}
+                    </div>
 
-                    {/* Task dots */}
-                    {dayTasks.length > 0 && inMonth && (
-                      <div className="flex items-center justify-center gap-0.5 mt-1 min-h-[6px]">
-                        {dayTasks.slice(0, 4).map((t, i) => (
+                    {/* Expanded view: show event labels */}
+                    {calendarExpanded && inMonth && (
+                      <div className="space-y-1 mt-1">
+                        {dayEvents.slice(0, 4).map((evt, i) => (
                           <div
                             key={i}
-                            className={`w-1.5 h-1.5 rounded-full ${
-                              t.priority === 'urgent' ? 'bg-red-400' :
-                              t.priority === 'high' ? 'bg-amber-400' :
-                              t.status === 'done' ? 'bg-emerald-500' :
-                              'bg-blue-400'
+                            className={`px-1.5 py-1 rounded text-[8px] font-bold truncate border-l-2 ${
+                              evt.type === 'campaign' ? 'bg-purple-500/10 border-purple-500 text-purple-400' :
+                              evt.type === 'appointment' ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400' :
+                              evt.priority === 'urgent' ? 'bg-red-500/10 border-red-500 text-red-400' :
+                              'bg-blue-500/10 border-blue-500 text-blue-400'
                             }`}
-                          />
+                          >
+                            {evt.type === 'campaign' && (evt.isStart ? 'Inizio: ' : evt.isEnd ? 'Fine: ' : '')}
+                            {evt.title}
+                          </div>
                         ))}
-                        {dayTasks.length > 4 && (
-                          <span className="text-[7px] text-zinc-600 font-bold">+{dayTasks.length - 4}</span>
+                        {dayEvents.length > 4 && (
+                          <p className="text-[7px] text-zinc-600 font-bold text-center">+{dayEvents.length - 4} altri</p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Compact view: dots */}
+                    {!calendarExpanded && dayEvents.length > 0 && inMonth && (
+                      <div className="flex items-center justify-center gap-0.5 mt-1 min-h-[6px]">
+                        {dayEvents.slice(0, 5).map((evt, i) => (
+                          <div key={i} className={`w-1.5 h-1.5 rounded-full ${evt.color}`} />
+                        ))}
+                        {dayEvents.length > 5 && (
+                          <span className="text-[7px] text-zinc-600 font-bold">+{dayEvents.length - 5}</span>
                         )}
                       </div>
                     )}
@@ -644,17 +825,58 @@ const Dashboard: React.FC<DashboardProps> = () => {
               })}
             </div>
 
-            {/* Today's tasks preview */}
+            {/* Legend */}
+            <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t border-white/5">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-blue-400" />
+                <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Attivita</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-purple-500" />
+                <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Campagne</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Appuntamenti</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-red-400" />
+                <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Urgenze/Deadline</span>
+              </div>
+            </div>
+
+            {/* Today's events preview */}
             <div className="mt-4 pt-4 border-t border-white/5">
               <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-2">
-                Attivita di oggi ({todayTasks.length})
+                Oggi ({getEventsForDay(today).length} eventi)
               </p>
               <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
-                {todayTasks.length === 0 ? (
-                  <p className="text-[10px] text-zinc-700 py-3 text-center italic">Nessuna attivita per oggi</p>
+                {getEventsForDay(today).length === 0 ? (
+                  <p className="text-[10px] text-zinc-700 py-3 text-center italic">Nessun evento per oggi</p>
                 ) : (
-                  todayTasks.map(task => (
-                    <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                  getEventsForDay(today).map(evt => (
+                    <div
+                      key={evt.id}
+                      onClick={() => evt.type === 'task' ? setSelectedTask(tasks.find(t => `task-${t.id}` === evt.id) || null) : undefined}
+                      className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.02] ${
+                        evt.type === 'campaign' ? 'border-purple-500/20 bg-purple-500/[0.03]' :
+                        evt.type === 'appointment' ? 'border-cyan-500/20 bg-cyan-500/[0.03]' :
+                        'border-white/5'
+                      }`}
+                    >
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${evt.color}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{evt.title}</p>
+                        {evt.description && <p className="text-[10px] text-zinc-600 truncate">{evt.description}</p>}
+                      </div>
+                      <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                        evt.type === 'campaign' ? 'bg-purple-500/10 text-purple-400' :
+                        evt.type === 'appointment' ? 'bg-cyan-500/10 text-cyan-400' :
+                        'bg-blue-500/10 text-blue-400'
+                      }`}>
+                        {evt.type === 'campaign' ? 'Campagna' : evt.type === 'appointment' ? 'Appunt.' : 'Task'}
+                      </span>
+                    </div>
                   ))
                 )}
               </div>
@@ -662,6 +884,94 @@ const Dashboard: React.FC<DashboardProps> = () => {
           </div>
         </div>
       </div>
+
+      {/* Calendar Day Detail Modal */}
+      <AnimatePresence>
+        {selectedCalendarDay && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedCalendarDay(null)}
+              className="absolute inset-0 bg-black/80 backdrop-blur-lg"
+            />
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-lg shadow-3xl overflow-hidden"
+            >
+              <div className="p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-black text-white uppercase tracking-tight">
+                      {format(selectedCalendarDay, 'd MMMM yyyy', { locale: it })}
+                    </h3>
+                    <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">
+                      {format(selectedCalendarDay, 'EEEE', { locale: it })}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setNewTaskDefaults({ date: format(selectedCalendarDay, 'yyyy-MM-dd') });
+                        setSelectedCalendarDay(null);
+                        setShowNewTaskModal(true);
+                      }}
+                      className="p-2 bg-blue-600 hover:bg-blue-700 rounded-xl text-white transition-all"
+                      title="Aggiungi attivita"
+                    >
+                      <Plus size={16} />
+                    </button>
+                    <button onClick={() => setSelectedCalendarDay(null)} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+                      <X size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 max-h-[60vh] overflow-y-auto custom-scrollbar">
+                  {getEventsForDay(format(selectedCalendarDay, 'yyyy-MM-dd')).map(evt => (
+                    <div
+                      key={evt.id}
+                      className={`p-4 rounded-2xl border ${
+                        evt.type === 'campaign' ? 'bg-purple-500/5 border-purple-500/20' :
+                        evt.type === 'appointment' ? 'bg-cyan-500/5 border-cyan-500/20' :
+                        evt.priority === 'urgent' ? 'bg-red-500/5 border-red-500/20' :
+                        'bg-zinc-900/50 border-white/5'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg tracking-wider ${
+                              evt.type === 'campaign' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
+                              evt.type === 'appointment' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                              'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                            }`}>
+                              {evt.type === 'campaign' ? (evt.isStart ? 'Inizio Campagna' : evt.isEnd ? 'Fine Campagna' : 'Deadline') :
+                               evt.type === 'appointment' ? (evt.appointmentType || 'Appuntamento') :
+                               'Attivita'}
+                            </span>
+                            {evt.priority && (
+                              <Flag size={10} className={PRIORITY_COLORS[evt.priority] || 'text-zinc-600'} />
+                            )}
+                          </div>
+                          <p className="text-sm font-black text-white">{evt.title}</p>
+                          {evt.description && (
+                            <p className="text-xs text-zinc-500 mt-1">{evt.description}</p>
+                          )}
+                        </div>
+                        <div className={`w-3 h-3 rounded-full flex-shrink-0 mt-1 ${evt.color}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Task Detail Modal */}
       <AnimatePresence>

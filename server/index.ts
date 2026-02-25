@@ -170,6 +170,23 @@ app.get('/api/talents/:id/credentials', (req: Request, res: Response) => {
     }
 });
 
+app.put('/api/talents/:id/credentials', (req: Request, res: Response) => {
+    try {
+        const user = usersDB.getByTalentId(req.params.id) as any;
+        if (!user) {
+            return res.status(404).json({ error: 'Utente per talent non trovato' });
+        }
+        const { newPassword } = req.body;
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'La password deve essere di almeno 6 caratteri' });
+        }
+        usersDB.update(user.id, { password: newPassword });
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.get('/api/talents/:id/finance', (req: Request, res: Response) => {
     try {
         const talentId = req.params.id;
@@ -353,13 +370,23 @@ app.post('/api/talents/import', (req: Request, res: Response) => {
         const created = results.filter(r => r.action === 'created').length;
         const updated = results.filter(r => r.action === 'updated').length;
 
+        // Collect credentials for newly created talents
+        const credentials = results
+            .filter(r => r.action === 'created' && r.password)
+            .map(r => ({
+                name: `${r.talent.firstName} ${r.talent.lastName}`,
+                email: r.talent.email,
+                password: r.password
+            }));
+
         res.json({
             success: true,
             imported: created,
             updated: updated,
             skipped: 0,
             errors: errors.length > 0 ? errors : undefined,
-            errorCount: errors.length
+            errorCount: errors.length,
+            credentials: credentials.length > 0 ? credentials : undefined
         });
     } catch (error: any) {
         console.error('Processo di importazione fallito:', error);

@@ -1,17 +1,18 @@
 
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, Copy, Plus, X, Save, Edit3, Trash2, Upload, ExternalLink,
   Download, Instagram, Phone, Mail, Calendar, MapPin, CreditCard,
   Briefcase, FileText, StickyNote, BarChart3, DollarSign, Link as LinkIcon,
-  ShieldCheck, Eye, EyeOff, Share2, Check
+  ShieldCheck, Eye, EyeOff, Share2, Check, Key, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format, parseISO } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { Talent, Campaign, Appointment, CampaignTalent } from '../types';
 import { useApp } from '../context/AppContext';
+import { talentsApi } from '../api';
 
 type TabId = 'panoramica' | 'foto' | 'anagrafica' | 'pagamenti' | 'social' | 'indirizzo' | 'dashboard' | 'note' | 'finanze';
 
@@ -53,6 +54,12 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [uploadType, setUploadType] = useState<'gallery' | 'attachments' | 'photo'>('gallery');
   const [sensitiveVisible, setSensitiveVisible] = useState(false);
+  const [credentials, setCredentials] = useState<{ username: string; email: string; password: string } | null>(null);
+  const [credentialsLoading, setCredentialsLoading] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordVisible, setPasswordVisible] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -142,6 +149,40 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
       talent.billing_address_street && `Indirizzo: ${talent.billing_address_street}, ${talent.billing_address_city || ''} ${talent.billing_address_zip || ''} ${talent.billing_address_country || ''}`,
     ].filter(Boolean).join('\n');
     if (lines) copyToClipboard(lines, 'Dati fatturazione');
+  };
+
+  // Fetch credentials
+  const fetchCredentials = useCallback(async () => {
+    if (!talent?.id) return;
+    setCredentialsLoading(true);
+    try {
+      const creds = await talentsApi.getCredentials(talent.id);
+      setCredentials(creds);
+    } catch {
+      setCredentials(null);
+    } finally {
+      setCredentialsLoading(false);
+    }
+  }, [talent?.id]);
+
+  useEffect(() => {
+    fetchCredentials();
+  }, [fetchCredentials]);
+
+  const handleChangePassword = async () => {
+    if (!talent?.id || !newPassword || newPassword.length < 6) return;
+    setPasswordSaving(true);
+    try {
+      await talentsApi.changePassword(talent.id, newPassword);
+      showToast('Password aggiornata', 'success');
+      setNewPassword('');
+      setShowChangePassword(false);
+      fetchCredentials();
+    } catch (err: any) {
+      showToast(err.message || 'Errore aggiornamento password', 'error');
+    } finally {
+      setPasswordSaving(false);
+    }
   };
 
   // WhatsApp finance copy
@@ -300,6 +341,7 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
         <motion.div key={activeTab} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
           {/* TAB: Panoramica */}
           {activeTab === 'panoramica' && (
+            <div className="space-y-0">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-6 space-y-4">
                 <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Info Rapide</h3>
@@ -354,6 +396,98 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Credenziali Accesso */}
+            <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-6 space-y-4 mt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-600/10 rounded-xl flex items-center justify-center">
+                    <Key size={16} className="text-blue-500" />
+                  </div>
+                  <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Credenziali di Accesso</h3>
+                </div>
+                {credentials && (
+                  <button
+                    onClick={() => {
+                      const text = `Credenziali accesso:\nEmail: ${credentials.email}\nUsername: ${credentials.username}\nPassword: ${credentials.password}`;
+                      copyToClipboard(text, 'Credenziali');
+                    }}
+                    className="flex items-center gap-1.5 text-[9px] font-black text-blue-500 uppercase tracking-widest hover:text-white transition-all"
+                  >
+                    <Copy size={11} /> Copia
+                  </button>
+                )}
+              </div>
+
+              {credentialsLoading ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 size={18} className="animate-spin text-zinc-600" />
+                </div>
+              ) : credentials ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Username</p>
+                      <p className="text-sm font-bold text-white select-all">{credentials.username}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Email</p>
+                      <p className="text-sm font-bold text-white select-all">{credentials.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest mb-1">Password</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-bold font-mono select-all text-white">
+                          {passwordVisible ? credentials.password : '••••••••'}
+                        </p>
+                        <button onClick={() => setPasswordVisible(!passwordVisible)} className="text-zinc-600 hover:text-white transition-colors">
+                          {passwordVisible ? <EyeOff size={13} /> : <Eye size={13} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {showChangePassword ? (
+                    <div className="flex items-end gap-3 bg-zinc-900/50 rounded-xl p-4 border border-white/5">
+                      <div className="flex-1">
+                        <label className="text-[9px] font-black text-zinc-600 uppercase tracking-widest block mb-1">Nuova Password (min. 6 caratteri)</label>
+                        <input
+                          type="text"
+                          value={newPassword}
+                          onChange={e => setNewPassword(e.target.value)}
+                          placeholder="Nuova password..."
+                          className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-blue-500/50 focus:outline-none"
+                        />
+                      </div>
+                      <button
+                        onClick={handleChangePassword}
+                        disabled={passwordSaving || newPassword.length < 6}
+                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
+                      >
+                        {passwordSaving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                        Salva
+                      </button>
+                      <button
+                        onClick={() => { setShowChangePassword(false); setNewPassword(''); }}
+                        className="text-zinc-500 hover:text-white p-2.5 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowChangePassword(true)}
+                      className="flex items-center gap-2 text-[10px] font-black text-blue-500 uppercase tracking-widest hover:text-white transition-all"
+                    >
+                      <Key size={12} /> Cambia Password
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-700 italic">Nessun account utente associato</p>
+              )}
+            </div>
             </div>
           )}
 
@@ -478,24 +612,18 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                {(!talent.payout_method || talent.payout_method === 'IBAN' || talent.payout_method === 'Entrambi') && (
-                  <>
-                    <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">IBAN</label>
-                      {isEditing ? (
-                        <input value={(editForm as any).iban || ''} onChange={e => setEditForm(prev => ({ ...prev, iban: e.target.value }))} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-blue-500/50 focus:outline-none" />
-                      ) : (
-                        <p className={`text-sm font-mono py-2 ${sensitiveVisible ? 'text-white' : 'text-zinc-800'}`}>
-                          {sensitiveVisible ? (talent.iban || '—') : '••••••••••••••••'}
-                        </p>
-                      )}
-                    </div>
-                    <Field label="Nome Banca" value={sensitiveVisible ? talent.bank_name : '••••'} field="bank_name" />
-                  </>
-                )}
-                {(!talent.payout_method || talent.payout_method === 'PayPal' || talent.payout_method === 'Entrambi') && (
-                  <Field label="Email PayPal" value={sensitiveVisible ? talent.paypal_email : '••••'} field="paypal_email" type="email" />
-                )}
+                <div>
+                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">IBAN</label>
+                  {isEditing ? (
+                    <input value={(editForm as any).iban || ''} onChange={e => setEditForm(prev => ({ ...prev, iban: e.target.value }))} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-mono focus:border-blue-500/50 focus:outline-none" />
+                  ) : (
+                    <p className={`text-sm font-mono py-2 ${sensitiveVisible ? 'text-white' : 'text-zinc-800'}`}>
+                      {sensitiveVisible ? (talent.iban || '—') : '••••••••••••••••'}
+                    </p>
+                  )}
+                </div>
+                <Field label="Nome Banca" value={sensitiveVisible ? talent.bank_name : '••••'} field="bank_name" />
+                <Field label="Email PayPal / Revolut" value={sensitiveVisible ? talent.paypal_email : '••••'} field="paypal_email" />
                 <Field label="P.IVA" value={sensitiveVisible ? talent.vat : '••••'} field="vat" />
                 <Field label="Codice Fiscale" value={sensitiveVisible ? talent.fiscal_code : '••••'} field="fiscal_code" />
               </div>
@@ -532,10 +660,12 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                <Field label="Instagram" value={talent.instagram} field="instagram" placeholder="https://instagram.com/..." />
-                <Field label="TikTok" value={talent.tiktok} field="tiktok" placeholder="https://tiktok.com/@..." />
-                <Field label="YouTube" value={talent.youtube_url} field="youtube_url" placeholder="https://youtube.com/..." />
-                <Field label="Twitch" value={talent.twitch_url} field="twitch_url" placeholder="https://twitch.tv/..." />
+                <Field label="Instagram URL" value={talent.instagram} field="instagram" placeholder="https://instagram.com/..." />
+                <Field label="Instagram Followers" value={talent.instagramFollowers?.toString()} field="instagramFollowers" type="number" placeholder="0" />
+                <Field label="TikTok URL" value={talent.tiktok} field="tiktok" placeholder="https://tiktok.com/@..." />
+                <Field label="TikTok Followers" value={talent.tiktokFollowers?.toString()} field="tiktokFollowers" type="number" placeholder="0" />
+                <Field label="YouTube URL" value={talent.youtube_url} field="youtube_url" placeholder="https://youtube.com/..." />
+                <Field label="Twitch URL" value={talent.twitch_url} field="twitch_url" placeholder="https://twitch.tv/..." />
               </div>
 
               <div>
