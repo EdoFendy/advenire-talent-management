@@ -9,13 +9,16 @@ import fs from 'fs';
 import {
     initializeDatabase,
     talentsDB,
-    brandsDB,
+    clientsDB,
     campaignsDB,
-    collaborationsDB,
+    campaignTalentsDB,
+    tasksDB,
+    homeNotesDB,
     appointmentsDB,
     incomeDB,
     extraCostsDB,
     notificationsDB,
+    quotesDB,
     searchDB,
     usersDB
 } from './database.js';
@@ -80,6 +83,7 @@ const upload = multer({
 // Initialize database
 initializeDatabase();
 
+// ============== HEALTH CHECK ==============
 app.get('/api/health', (req: Request, res: Response) => {
     res.json({ status: 'ok', online: true });
 });
@@ -111,8 +115,6 @@ app.post('/api/auth/login', (req: Request, res: Response) => {
 });
 
 app.get('/api/auth/me', (req: Request, res: Response) => {
-    // Mock user retrieval based on simulation - in real app, decode token
-    // For now, client handles state
     res.json({ status: 'ok' });
 });
 
@@ -130,11 +132,6 @@ app.put('/api/auth/password', (req: Request, res: Response) => {
     }
 });
 
-// ============== HEALTH CHECK ==============
-app.get('/api/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
-
 // ============== TALENTS API ==============
 app.get('/api/talents', (req: Request, res: Response) => {
     try {
@@ -149,7 +146,7 @@ app.get('/api/talents/:id', (req: Request, res: Response) => {
     try {
         const talent = talentsDB.getById(req.params.id);
         if (!talent) {
-            return res.status(404).json({ error: 'Talent not found' });
+            return res.status(404).json({ error: 'Talent non trovato' });
         }
         res.json(talent);
     } catch (error: any) {
@@ -161,12 +158,52 @@ app.get('/api/talents/:id/credentials', (req: Request, res: Response) => {
     try {
         const user = usersDB.getByTalentId(req.params.id) as any;
         if (!user) {
-            return res.status(404).json({ error: 'User for talent not found' });
+            return res.status(404).json({ error: 'Utente per talent non trovato' });
         }
         res.json({
             username: user.username,
             email: user.email,
             password: user.password
+        });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/talents/:id/finance', (req: Request, res: Response) => {
+    try {
+        const talentId = req.params.id;
+        const talent = talentsDB.getById(talentId);
+        if (!talent) {
+            return res.status(404).json({ error: 'Talent non trovato' });
+        }
+
+        const campaignTalents = campaignTalentsDB.getByTalent(talentId) as any[];
+
+        // Enrich with client info
+        const campaigns = campaignTalents.map((ct: any) => {
+            let clientName = '';
+            if (ct.client_id) {
+                const client = clientsDB.getById(ct.client_id) as any;
+                clientName = client?.ragione_sociale || '';
+            }
+            return {
+                ...ct,
+                client_name: clientName
+            };
+        });
+
+        const totalEarned = campaigns.reduce((acc: number, ct: any) => acc + (ct.compenso_lordo || 0), 0);
+        const totalPaid = campaigns.filter((ct: any) => ct.stato === 'pagato').reduce((acc: number, ct: any) => acc + (ct.compenso_lordo || 0), 0);
+        const totalUnpaid = totalEarned - totalPaid;
+
+        res.json({
+            campaigns,
+            totals: {
+                earned: totalEarned,
+                paid: totalPaid,
+                unpaid: totalUnpaid
+            }
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -181,13 +218,13 @@ app.post('/api/talents', (req: Request, res: Response) => {
         });
 
         // Create User for Talent
-        const password = Math.random().toString(36).slice(-8); // Simple random password
+        const password = Math.random().toString(36).slice(-8);
         const username = `${talent.firstName.toLowerCase().replace(/\s/g, '')}.${talent.lastName.toLowerCase().replace(/\s/g, '')}`;
         const user = usersDB.create({
             id: `u-${talent.id}`,
             name: talent.firstName + ' ' + talent.lastName,
             username: username,
-            email: talent.email,
+            email: talent.email || `${username}@advenire.local`,
             password: password,
             role: 'talent',
             talentId: talent.id
@@ -198,7 +235,7 @@ app.post('/api/talents', (req: Request, res: Response) => {
             id: `notif-${Date.now()}`,
             type: 'talent_created',
             title: 'Nuovo Talent Aggiunto',
-            message: `${talent.stageName} è stato aggiunto al roster`,
+            message: `${talent.firstName} ${talent.lastName} aggiunto al roster`,
             link: `/roster/${talent.id}`
         });
 
@@ -208,128 +245,124 @@ app.post('/api/talents', (req: Request, res: Response) => {
     }
 });
 
-app.post('/api/talents/import', upload.single('file'), (req: Request, res: Response) => {
+// Import talents from mapped JSON data (used by wizard)
+app.post('/api/talents/import', (req: Request, res: Response) => {
     try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
+        const { rows } = req.body;
+        if (!rows || !Array.isArray(rows) || rows.length === 0) {
+            return res.status(400).json({ error: 'Nessun dato da importare' });
         }
 
-        const csvPath = req.file.path;
-        const csvContent = fs.readFileSync(csvPath, 'utf8');
+        const results: any[] = [];
+        const errors: string[] = [];
 
-        // Simple CSV Parser handling quotes
-        const parseCSV = (text: string) => {
-            const rows = [];
-            let row: string[] = [];
-            let field = '';
-            let inQuotes = false;
-            for (let i = 0; i < text.length; i++) {
-                const char = text[i];
-                const nextChar = text[i + 1];
-                if (char === '"') {
-                    if (inQuotes && nextChar === '"') { field += '"'; i++; }
-                    else inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) { row.push(field.trim()); field = ''; }
-                else if ((char === '\r' || char === '\n') && !inQuotes) {
-                    if (field || row.length > 0) {
-                        row.push(field.trim());
-                        rows.push(row);
-                        row = [];
-                        field = '';
-                    }
-                    if (char === '\r' && nextChar === '\n') i++;
-                } else field += char;
-            }
-            if (field || row.length > 0) { row.push(field.trim()); rows.push(row); }
-            return rows;
-        };
+        // Valid talent field keys that map directly to DB columns
+        const directFields = [
+            'firstName', 'lastName', 'stageName', 'display_name', 'phone', 'email',
+            'tiktok', 'tiktokFollowers', 'instagram', 'instagramFollowers',
+            'youtube_url', 'twitch_url', 'other_socials',
+            'address_street', 'address_city', 'address_zip', 'address_country',
+            'payout_method', 'iban', 'bank_name', 'paypal_email', 'vat', 'fiscal_code',
+            'billing_name', 'billing_address_street', 'billing_address_city',
+            'billing_address_zip', 'billing_address_country', 'notes', 'status'
+        ];
 
-        const rows = parseCSV(csvContent);
-        if (rows.length < 2) return res.status(400).json({ error: 'Il file CSV sembra vuoto o non valido' });
-
-        const data = rows.slice(1);
-        console.log(`Starting import of ${data.length} rows...`);
-
-        const results = [];
-        const errors = [];
-
-        for (const row of data) {
+        for (let i = 0; i < rows.length; i++) {
             try {
-                if (row.length < 2) continue;
+                const row = rows[i];
+                const nome = (row.firstName || '').trim();
+                const cognome = (row.lastName || '').trim();
 
-                const nome = row[0] || '';
-                const cognome = row[1] || '';
-                const tiktok = row[2] || '';
-                // Clean and parse follower counts (remove dots/commas if present)
-                const tiktokFollowers = Math.round(parseFloat((row[3] || '0').replace(/[\.,]/g, '')));
-                const instagram = row[5] || '';
-                const instagramFollowers = Math.round(parseFloat((row[6] || '0').replace(/[\.,]/g, '')));
-                const billingData = row[8] || '';
-                const billingAddress = row[9] || '';
-                const shippingAddress = row[10] || '';
-                const email = row[11] || `${nome.toLowerCase().replace(/\s/g, '')}.${cognome.toLowerCase().replace(/\s/g, '')}@import.com`;
-                const phone = row[12] || '';
-                const notes = row[13] || '';
-
-                const ibanMatch = billingData.match(/IT[0-9]{2}[A-Z][0-9]{10}[0-9A-Z]{12}/);
-                const vatMatch = billingData.match(/[0-9]{11}/);
-
-                const talentId = `t-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-                const talent = {
-                    id: talentId,
-                    firstName: nome,
-                    lastName: cognome,
-                    stageName: `${nome} ${cognome}`.trim(),
-                    email: email,
-                    phone: phone,
-                    instagram: instagram,
-                    instagramFollowers: instagramFollowers,
-                    tiktok: tiktok,
-                    tiktokFollowers: tiktokFollowers,
-                    address: billingAddress || shippingAddress,
-                    shippingNotes: shippingAddress,
-                    iban: ibanMatch ? ibanMatch[0] : null,
-                    vat: vatMatch ? vatMatch[0] : null,
-                    taxNotes: billingData,
-                    status: 'active',
-                    notes: notes,
-                    photoUrl: `https://ui-avatars.com/api/?name=${nome}+${cognome}&background=random`
-                };
-
-                const created = talentsDB.create(talent);
-
-                const password = Math.random().toString(36).slice(-8);
-                const username = `${nome.toLowerCase().replace(/\s/g, '')}.${cognome.toLowerCase().replace(/\s/g, '')}`;
-                try {
-                    usersDB.create({
-                        id: `u-${talentId}`,
-                        name: `${nome} ${cognome}`,
-                        username: username,
-                        email: email,
-                        password: password,
-                        role: 'talent',
-                        talentId: talentId
-                    });
-                } catch (e: any) {
-                    console.warn(`Could not create user for ${email}: ${e.message}`);
+                if (!nome || !cognome) {
+                    errors.push(`Riga ${i + 1} (${nome} ${cognome}): Nome e Cognome sono obbligatori`);
+                    continue;
                 }
 
-                results.push({ talent: created, password });
+                const email = (row.email || '').trim() || `${nome.toLowerCase().replace(/\s/g, '')}.${cognome.toLowerCase().replace(/\s/g, '')}@import.com`;
+                const phone = (row.phone || '').trim();
+
+                // Dedup: check by email or phone
+                let existingTalent: any = null;
+                const autoEmail = `${nome.toLowerCase().replace(/\s/g, '')}.${cognome.toLowerCase().replace(/\s/g, '')}@import.com`;
+                if (email && email !== autoEmail) {
+                    existingTalent = talentsDB.findByEmail(email);
+                }
+                if (!existingTalent && phone) {
+                    existingTalent = talentsDB.findByPhone(phone);
+                }
+
+                if (existingTalent) {
+                    // Update existing - only non-empty fields
+                    const updates: any = {};
+                    for (const field of directFields) {
+                        const val = (row[field] || '').trim();
+                        if (val) updates[field] = val;
+                    }
+                    if (!updates.stageName) updates.stageName = `${nome} ${cognome}`.trim();
+
+                    talentsDB.update(existingTalent.id, updates);
+                    results.push({ action: 'updated', talent: existingTalent });
+                } else {
+                    const talentId = `t-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+                    const talent: any = {
+                        id: talentId,
+                        firstName: nome,
+                        lastName: cognome,
+                        stageName: (row.stageName || '').trim() || `${nome} ${cognome}`.trim(),
+                        email: email,
+                        phone: phone,
+                        status: (row.status || '').trim() || 'active',
+                        photoUrl: `https://ui-avatars.com/api/?name=${encodeURIComponent(nome)}+${encodeURIComponent(cognome)}&background=random`
+                    };
+
+                    // Copy all mapped fields
+                    for (const field of directFields) {
+                        if (row[field] && !talent[field]) {
+                            talent[field] = (row[field] || '').trim();
+                        }
+                    }
+
+                    talentsDB.create(talent);
+
+                    // Create user account
+                    const pwd = Math.random().toString(36).slice(-8);
+                    const uname = `${nome.toLowerCase().replace(/\s/g, '')}.${cognome.toLowerCase().replace(/\s/g, '')}`;
+                    try {
+                        usersDB.create({
+                            id: `u-${talentId}`,
+                            name: `${nome} ${cognome}`,
+                            username: uname,
+                            email: email,
+                            password: pwd,
+                            role: 'talent',
+                            talentId: talentId
+                        });
+                    } catch (e: any) {
+                        console.warn(`Impossibile creare utente per ${email}: ${e.message}`);
+                    }
+
+                    results.push({ action: 'created', talent, password: pwd });
+                }
             } catch (error: any) {
-                console.error(`Error importing row:`, row, error);
-                errors.push(`Riga ${row[0] || ''} ${row[1] || ''}: ${error.message}`);
+                console.error(`Errore importando riga ${i + 1}:`, error);
+                errors.push(`Riga ${i + 1}: ${error.message}`);
             }
         }
 
-        if (fs.existsSync(csvPath)) fs.unlinkSync(csvPath);
+        const created = results.filter(r => r.action === 'created').length;
+        const updated = results.filter(r => r.action === 'updated').length;
 
         res.json({
             success: true,
-            imported: results.length,
-            errors: errors.length > 0 ? errors : undefined
+            imported: created,
+            updated: updated,
+            skipped: 0,
+            errors: errors.length > 0 ? errors : undefined,
+            errorCount: errors.length
         });
     } catch (error: any) {
-        console.error('Import process failed:', error);
+        console.error('Processo di importazione fallito:', error);
         res.status(500).json({ error: error.message });
     }
 });
@@ -338,7 +371,7 @@ app.put('/api/talents/:id', (req: Request, res: Response) => {
     try {
         const talent = talentsDB.update(req.params.id, req.body);
         if (!talent) {
-            return res.status(404).json({ error: 'Talent not found' });
+            return res.status(404).json({ error: 'Talent non trovato' });
         }
         res.json(talent);
     } catch (error: any) {
@@ -359,12 +392,12 @@ app.delete('/api/talents/:id', (req: Request, res: Response) => {
 app.post('/api/talents/:id/upload/:type', upload.single('file'), (req: Request, res: Response) => {
     try {
         if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
+            return res.status(400).json({ error: 'Nessun file caricato' });
         }
 
         const talent = talentsDB.getById(req.params.id);
         if (!talent) {
-            return res.status(404).json({ error: 'Talent not found' });
+            return res.status(404).json({ error: 'Talent non trovato' });
         }
 
         const fileUrl = `/uploads/${req.params.type}/${req.file.filename}`;
@@ -393,77 +426,65 @@ app.post('/api/talents/:id/upload/:type', upload.single('file'), (req: Request, 
     }
 });
 
-// ============== BRANDS API ==============
-app.get('/api/brands', (req: Request, res: Response) => {
+// ============== CLIENTS API ==============
+app.get('/api/clients', (req: Request, res: Response) => {
     try {
-        const brands = brandsDB.getAll();
-        res.json(brands);
+        const clients = clientsDB.getAll();
+        res.json(clients);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.get('/api/brands/:id', (req: Request, res: Response) => {
+app.get('/api/clients/:id', (req: Request, res: Response) => {
     try {
-        const brand = brandsDB.getById(req.params.id);
-        if (!brand) {
-            return res.status(404).json({ error: 'Brand not found' });
+        const client = clientsDB.getById(req.params.id);
+        if (!client) {
+            return res.status(404).json({ error: 'Cliente non trovato' });
         }
-        res.json(brand);
+        res.json(client);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/api/brands', (req: Request, res: Response) => {
+app.get('/api/clients/:id/campaigns', (req: Request, res: Response) => {
     try {
-        const brand = brandsDB.create({
-            id: `brand-${Date.now()}`,
+        const campaigns = clientsDB.getCampaigns(req.params.id);
+        res.json(campaigns);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/clients', (req: Request, res: Response) => {
+    try {
+        const client = clientsDB.create({
+            id: `client-${Date.now()}`,
             ...req.body
         });
-        res.status(201).json(brand);
+        res.status(201).json(client);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.put('/api/brands/:id', (req: Request, res: Response) => {
+app.put('/api/clients/:id', (req: Request, res: Response) => {
     try {
-        const brand = brandsDB.update(req.params.id, req.body);
-        if (!brand) {
-            return res.status(404).json({ error: 'Brand not found' });
+        const client = clientsDB.update(req.params.id, req.body);
+        if (!client) {
+            return res.status(404).json({ error: 'Cliente non trovato' });
         }
-        res.json(brand);
+        res.json(client);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.delete('/api/brands/:id', (req: Request, res: Response) => {
+app.delete('/api/clients/:id', (req: Request, res: Response) => {
     try {
-        brandsDB.delete(req.params.id);
+        clientsDB.delete(req.params.id);
         res.json({ success: true });
-    } catch (error: any) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// Brand logo upload
-app.post('/api/brands/:id/upload/logo', upload.single('file'), (req: Request, res: Response) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({ error: 'No file uploaded' });
-        }
-
-        const brand = brandsDB.getById(req.params.id);
-        if (!brand) {
-            return res.status(404).json({ error: 'Brand not found' });
-        }
-
-        const fileUrl = `/uploads/${req.params.type}/${req.file.filename}`;
-        brandsDB.update(req.params.id, { logoUrl: fileUrl });
-
-        res.json({ url: fileUrl, success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -483,19 +504,28 @@ app.get('/api/campaigns/:id', (req: Request, res: Response) => {
     try {
         const campaign = campaignsDB.getById(req.params.id);
         if (!campaign) {
-            return res.status(404).json({ error: 'Campaign not found' });
+            return res.status(404).json({ error: 'Campagna non trovata' });
         }
 
         // Get related data
-        const collaborations = collaborationsDB.getByCampaign(req.params.id);
+        const talents = campaignTalentsDB.getByCampaign(req.params.id);
         const incomeItems = incomeDB.getByCampaign(req.params.id);
         const costs = extraCostsDB.getByCampaign(req.params.id);
+        const tasks = tasksDB.getAll({ related_type: 'campaign', related_id: req.params.id });
+
+        // Get client info
+        let client = null;
+        if ((campaign as any).client_id) {
+            client = clientsDB.getById((campaign as any).client_id);
+        }
 
         res.json({
             ...campaign,
-            collaborations,
+            campaignTalents: talents,
             income: incomeItems,
-            extraCosts: costs
+            extraCosts: costs,
+            tasks,
+            client
         });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
@@ -505,66 +535,80 @@ app.get('/api/campaigns/:id', (req: Request, res: Response) => {
 app.post('/api/campaigns', (req: Request, res: Response) => {
     try {
         const campaignId = `c-${Date.now()}`;
+        const data = req.body;
+
+        // Support both old format { campaign: {...}, linkTalent: {...} } and new format
+        const campaignData = data.campaign || data;
+
         const campaign = campaignsDB.create({
             id: campaignId,
-            ...req.body.campaign
+            ...campaignData
         });
 
-        // If talent is linked, create collaboration and appointment
-        if (req.body.linkTalent && req.body.linkTalent.enabled && req.body.linkTalent.talentId) {
-            const talent = talentsDB.getById(req.body.linkTalent.talentId);
-            if (talent) {
-                const totalBudget = Number(req.body.campaign.totalBudget) || 0;
-                const agencyFeePercent = Number(req.body.campaign.agencyFeePercent) || 30;
-                const talentFee = Math.floor(totalBudget * (1 - agencyFeePercent / 100));
-                const collabId = `col-${Date.now()}`;
+        // If talents are provided (new wizard format)
+        if (data.talents && Array.isArray(data.talents)) {
+            for (const t of data.talents) {
+                campaignTalentsDB.create({
+                    id: `ct-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                    campaign_id: campaignId,
+                    talent_id: t.talent_id,
+                    compenso_lordo: t.compenso_lordo || 0,
+                    stato: 'invitato',
+                    note: t.note || null
+                });
+            }
+        }
 
-                collaborationsDB.create({
-                    id: collabId,
-                    talentId: talent.id,
-                    brand: req.body.campaign.brand,
-                    campaignId: campaignId,
-                    type: req.body.linkTalent.type || 'Shooting + Social Kit',
-                    fee: talentFee,
-                    status: 'Confermata',
-                    paymentStatus: 'Non Saldato',
-                    deadline: req.body.campaign.deadline
+        // Legacy support: linkTalent
+        if (data.linkTalent && data.linkTalent.enabled && data.linkTalent.talentId) {
+            const talent = talentsDB.getById(data.linkTalent.talentId);
+            if (talent) {
+                const totalBudget = Number(campaignData.totalBudget) || 0;
+                const agencyFeePercent = Number(campaignData.agencyFeePercent) || 30;
+                const talentFee = Math.floor(totalBudget * (1 - agencyFeePercent / 100));
+
+                campaignTalentsDB.create({
+                    id: `ct-${Date.now()}`,
+                    campaign_id: campaignId,
+                    talent_id: talent.id,
+                    compenso_lordo: talentFee,
+                    stato: 'confermato'
                 });
 
-                const activityDate = req.body.linkTalent.activityDate ? new Date(req.body.linkTalent.activityDate).toISOString() : new Date().toISOString();
+                const activityDate = data.linkTalent.activityDate ? new Date(data.linkTalent.activityDate).toISOString() : new Date().toISOString();
 
                 appointmentsDB.create({
                     id: `app-${Date.now()}`,
                     talentId: talent.id,
-                    talentName: talent.stageName,
-                    brand: req.body.campaign.brand,
+                    talentName: talent.stageName || `${talent.firstName} ${talent.lastName}`,
+                    brand: campaignData.brand || '',
                     type: 'Shooting',
                     date: activityDate,
                     status: 'planned',
-                    collaborationId: collabId,
-                    description: `Shooting per ${req.body.campaign.name}`
+                    description: `Shooting per ${campaignData.name}`
                 });
 
-                // Create notification for talent
                 notificationsDB.create({
                     id: `notif-${Date.now()}`,
                     userId: talent.id,
                     type: 'new_collaboration',
                     title: 'Nuova Collaborazione',
-                    message: `Sei stato assegnato alla campagna ${req.body.campaign.name} per ${req.body.campaign.brand}`,
+                    message: `Sei stato assegnato alla campagna ${campaignData.name}`,
                     link: `/my-calendar`
                 });
             }
         }
 
         // Create income entry
-        incomeDB.create({
-            id: `inc-${Date.now()}`,
-            campaignId: campaignId,
-            amount: Number(req.body.campaign.totalBudget) || 0,
-            status: 'pending',
-            expectedDate: req.body.campaign.deadline
-        });
+        if (campaignData.totalBudget) {
+            incomeDB.create({
+                id: `inc-${Date.now()}`,
+                campaignId: campaignId,
+                amount: Number(campaignData.totalBudget) || 0,
+                status: 'pending',
+                expectedDate: campaignData.data_fine || campaignData.deadline || null
+            });
+        }
 
         res.status(201).json(campaign);
     } catch (error: any) {
@@ -576,7 +620,7 @@ app.put('/api/campaigns/:id', (req: Request, res: Response) => {
     try {
         const campaign = campaignsDB.update(req.params.id, req.body);
         if (!campaign) {
-            return res.status(404).json({ error: 'Campaign not found' });
+            return res.status(404).json({ error: 'Campagna non trovata' });
         }
         res.json(campaign);
     } catch (error: any) {
@@ -593,67 +637,135 @@ app.delete('/api/campaigns/:id', (req: Request, res: Response) => {
     }
 });
 
-// ============== COLLABORATIONS API ==============
-app.get('/api/collaborations', (req: Request, res: Response) => {
+// ============== CAMPAIGN TALENTS API ==============
+app.get('/api/campaign-talents', (req: Request, res: Response) => {
     try {
-        const { talentId, campaignId } = req.query;
-        let collaborations;
+        const { campaignId, talentId } = req.query;
 
-        if (talentId) {
-            collaborations = collaborationsDB.getByTalent(talentId as string);
-        } else if (campaignId) {
-            collaborations = collaborationsDB.getByCampaign(campaignId as string);
+        if (campaignId) {
+            res.json(campaignTalentsDB.getByCampaign(campaignId as string));
+        } else if (talentId) {
+            res.json(campaignTalentsDB.getByTalent(talentId as string));
         } else {
-            collaborations = collaborationsDB.getAll();
+            res.json(campaignTalentsDB.getAll());
         }
-
-        res.json(collaborations);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.post('/api/collaborations', (req: Request, res: Response) => {
+app.post('/api/campaign-talents', (req: Request, res: Response) => {
     try {
-        const collabId = `col-${Date.now()}`;
-        const collab = collaborationsDB.create({
-            id: collabId,
-            ...req.body.collaboration
+        const ct = campaignTalentsDB.create({
+            id: `ct-${Date.now()}`,
+            ...req.body
         });
-
-        // Create appointments if provided
-        if (req.body.appointments && req.body.appointments.length > 0) {
-            req.body.appointments.forEach((app: any, index: number) => {
-                appointmentsDB.create({
-                    id: `app-${Date.now()}-${index}`,
-                    ...app,
-                    collaborationId: collabId
-                });
-            });
-        }
-
-        res.status(201).json(collab);
+        res.status(201).json(ct);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.put('/api/collaborations/:id', (req: Request, res: Response) => {
+app.put('/api/campaign-talents/:id', (req: Request, res: Response) => {
     try {
-        const collab = collaborationsDB.update(req.params.id, req.body);
-        if (!collab) {
-            return res.status(404).json({ error: 'Collaboration not found' });
+        const ct = campaignTalentsDB.update(req.params.id, req.body);
+        if (!ct) {
+            return res.status(404).json({ error: 'Record non trovato' });
         }
-        res.json(collab);
+        res.json(ct);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
 });
 
-app.delete('/api/collaborations/:id', (req: Request, res: Response) => {
+app.delete('/api/campaign-talents/:id', (req: Request, res: Response) => {
     try {
-        collaborationsDB.delete(req.params.id);
+        campaignTalentsDB.delete(req.params.id);
         res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============== TASKS API ==============
+app.get('/api/tasks', (req: Request, res: Response) => {
+    try {
+        const filters: any = {};
+        if (req.query.status) filters.status = req.query.status;
+        if (req.query.priority) filters.priority = req.query.priority;
+        if (req.query.due_date) filters.due_date = req.query.due_date;
+        if (req.query.due_date_from) filters.due_date_from = req.query.due_date_from;
+        if (req.query.due_date_to) filters.due_date_to = req.query.due_date_to;
+        if (req.query.related_type) filters.related_type = req.query.related_type;
+        if (req.query.related_id) filters.related_id = req.query.related_id;
+
+        const tasks = tasksDB.getAll(Object.keys(filters).length > 0 ? filters : undefined);
+        res.json(tasks);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/tasks/:id', (req: Request, res: Response) => {
+    try {
+        const task = tasksDB.getById(req.params.id);
+        if (!task) {
+            return res.status(404).json({ error: 'Attivita non trovata' });
+        }
+        res.json(task);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/tasks', (req: Request, res: Response) => {
+    try {
+        const task = tasksDB.create({
+            id: `task-${Date.now()}`,
+            ...req.body
+        });
+        res.status(201).json(task);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/tasks/:id', (req: Request, res: Response) => {
+    try {
+        const task = tasksDB.update(req.params.id, req.body);
+        if (!task) {
+            return res.status(404).json({ error: 'Attivita non trovata' });
+        }
+        res.json(task);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/tasks/:id', (req: Request, res: Response) => {
+    try {
+        tasksDB.delete(req.params.id);
+        res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============== HOME NOTES API ==============
+app.get('/api/home-notes', (req: Request, res: Response) => {
+    try {
+        const note = homeNotesDB.get();
+        res.json(note);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/home-notes', (req: Request, res: Response) => {
+    try {
+        const { note_text } = req.body;
+        const note = homeNotesDB.upsert(note_text || '');
+        res.json(note);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -693,7 +805,7 @@ app.put('/api/appointments/:id', (req: Request, res: Response) => {
     try {
         const appointment = appointmentsDB.update(req.params.id, req.body);
         if (!appointment) {
-            return res.status(404).json({ error: 'Appointment not found' });
+            return res.status(404).json({ error: 'Appuntamento non trovato' });
         }
         res.json(appointment);
     } catch (error: any) {
@@ -744,7 +856,7 @@ app.put('/api/income/:id', (req: Request, res: Response) => {
     try {
         const income = incomeDB.update(req.params.id, req.body);
         if (!income) {
-            return res.status(404).json({ error: 'Income not found' });
+            return res.status(404).json({ error: 'Entrata non trovata' });
         }
         res.json(income);
     } catch (error: any) {
@@ -795,7 +907,7 @@ app.put('/api/costs/:id', (req: Request, res: Response) => {
     try {
         const cost = extraCostsDB.update(req.params.id, req.body);
         if (!cost) {
-            return res.status(404).json({ error: 'Cost not found' });
+            return res.status(404).json({ error: 'Costo non trovato' });
         }
         res.json(cost);
     } catch (error: any) {
@@ -867,21 +979,21 @@ app.get('/api/search', (req: Request, res: Response) => {
 app.get('/api/analytics', (req: Request, res: Response) => {
     try {
         const campaigns = campaignsDB.getAll() as any[];
-        const collaborations = collaborationsDB.getAll() as any[];
+        const allCampaignTalents = campaignTalentsDB.getAll() as any[];
         const allIncome = incomeDB.getAll() as any[];
         const allCosts = extraCostsDB.getAll() as any[];
         const talents = talentsDB.getAll();
 
         const fatturato = campaigns.reduce((acc, c) => acc + (c.totalBudget || 0), 0);
-        const talentPayouts = collaborations.reduce((acc, c) => acc + (c.fee || 0), 0);
+        const talentPayouts = allCampaignTalents.reduce((acc, ct) => acc + (ct.compenso_lordo || 0), 0);
         const totalExtraCosts = allCosts.reduce((acc, c) => acc + (c.amount || 0), 0);
         const utile = fatturato - talentPayouts - totalExtraCosts;
 
         const incassoRicevuto = allIncome.filter((i: any) => i.status === 'received').reduce((acc: number, i: any) => acc + i.amount, 0);
         const incassoPending = allIncome.filter((i: any) => i.status === 'pending').reduce((acc: number, i: any) => acc + i.amount, 0);
 
-        const collabPaid = collaborations.filter((c: any) => c.paymentStatus === 'Saldato').length;
-        const collabUnpaid = collaborations.filter((c: any) => c.paymentStatus === 'Non Saldato').length;
+        const ctPaid = allCampaignTalents.filter((ct: any) => ct.stato === 'pagato').length;
+        const ctUnpaid = allCampaignTalents.filter((ct: any) => ct.stato !== 'pagato').length;
 
         res.json({
             totals: {
@@ -895,10 +1007,10 @@ app.get('/api/analytics', (req: Request, res: Response) => {
                 received: incassoRicevuto,
                 pending: incassoPending
             },
-            collaborations: {
-                total: collaborations.length,
-                paid: collabPaid,
-                unpaid: collabUnpaid
+            campaignTalents: {
+                total: allCampaignTalents.length,
+                paid: ctPaid,
+                unpaid: ctUnpaid
             },
             talents: {
                 total: talents.length,
@@ -910,6 +1022,56 @@ app.get('/api/analytics', (req: Request, res: Response) => {
                 closed: campaigns.filter((c: any) => c.status === 'Chiusa').length
             }
         });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============== QUOTES ENDPOINTS ==============
+app.get('/api/quotes', (req: Request, res: Response) => {
+    try {
+        const filters: any = {};
+        if (req.query.client_id) filters.client_id = req.query.client_id;
+        if (req.query.stato) filters.stato = req.query.stato;
+        const quotes = quotesDB.getAll(Object.keys(filters).length > 0 ? filters : undefined);
+        res.json(quotes);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/api/quotes/:id', (req: Request, res: Response) => {
+    try {
+        const quote = quotesDB.getById(req.params.id);
+        if (!quote) return res.status(404).json({ error: 'Preventivo non trovato' });
+        res.json(quote);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.post('/api/quotes', (req: Request, res: Response) => {
+    try {
+        const quote = quotesDB.create(req.body);
+        res.status(201).json(quote);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/quotes/:id', (req: Request, res: Response) => {
+    try {
+        const quote = quotesDB.update(req.params.id, req.body);
+        res.json(quote);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.delete('/api/quotes/:id', (req: Request, res: Response) => {
+    try {
+        quotesDB.delete(req.params.id);
+        res.json({ success: true });
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

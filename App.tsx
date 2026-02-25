@@ -2,9 +2,9 @@
 import React, { useState } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Briefcase, Wallet, Bell, Search,
+  LayoutDashboard, Users, Briefcase, Wallet, Bell,
   Menu, X, LogOut, ChevronRight, Calendar as CalendarIcon,
-  Settings, User, Building2
+  Building2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -17,17 +17,13 @@ import Finance from './pages/Finance';
 import TalentDashboard from './pages/TalentDashboard';
 import TalentCalendar from './pages/TalentCalendar';
 import Login from './pages/Login';
-import Brands from './pages/Brands';
+import Clients from './pages/Clients';
 
 // Context & Types
 import { AppProvider, useApp } from './context/AppContext';
-import { Role } from './types';
-
-// Components
-// Removed external toaster for custom implementation compatible with Context
 
 const ToastContainer = () => {
-  const { toasts, removeToast } = useApp();
+  const { toasts, dismissToast } = useApp();
 
   return (
     <div className="fixed top-6 right-6 z-[100] flex flex-col gap-2 pointer-events-none">
@@ -48,7 +44,7 @@ const ToastContainer = () => {
                 'bg-blue-500'
               }`} />
             <p className="text-xs font-black uppercase tracking-wide flex-1">{toast.message}</p>
-            <button onClick={() => removeToast(toast.id)} className="ml-2 hover:opacity-70"><X size={14} /></button>
+            <button onClick={() => dismissToast(toast.id)} className="ml-2 hover:opacity-70"><X size={14} /></button>
           </motion.div>
         ))}
       </AnimatePresence>
@@ -56,7 +52,7 @@ const ToastContainer = () => {
   );
 };
 
-const SidebarItem = ({ icon: Icon, label, path, active, onClick }: any) => (
+const SidebarItem = ({ icon: Icon, label, active, onClick }: any) => (
   <button
     onClick={onClick}
     className={`w-full flex items-center space-x-3 px-6 py-4 rounded-2xl transition-all duration-300 group ${active
@@ -73,11 +69,9 @@ const SidebarItem = ({ icon: Icon, label, path, active, onClick }: any) => (
 const AppContent: React.FC = () => {
   const {
     auth, logout,
-    talents, campaigns, collaborations, appointments, income, extraCosts, brands,
-    addTalent, addCampaign, addCollaboration, updateCollaboration, importTalentsCSV,
-    addIncome, updateIncome, deleteIncome,
-    addBrand, updateBrand, deleteBrand,
-    isLoading, isOnline, notifications
+    talents, campaigns, campaignTalents, appointments, income, extraCosts,
+    addCampaignTalent,
+    isLoading, notifications
   } = useApp();
 
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -101,23 +95,36 @@ const AppContent: React.FC = () => {
   }
 
   const isTalent = auth.user.role === 'talent';
-  const currentTalent = isTalent ? talents.find(t => t.id === auth.user.talentId) : null;
+  const currentTalent = isTalent ? talents.find(t => t.id === auth.user!.talentId) : null;
 
   const navItems = isTalent ? [
     { icon: LayoutDashboard, label: 'Hub Personale', path: '/my-dashboard' },
     { icon: CalendarIcon, label: 'Il Mio Calendario', path: '/my-calendar' },
     { icon: Wallet, label: 'I Miei Guadagni', path: '/my-finance' },
   ] : [
-    { icon: LayoutDashboard, label: 'Dashboard Operativa', path: '/' },
-    { icon: Users, label: 'Roster Talent', path: '/roster' },
-    { icon: Building2, label: 'Brand & Clienti', path: '/brands' },
+    { icon: LayoutDashboard, label: 'Home', path: '/' },
+    { icon: Users, label: 'Roster', path: '/roster' },
+    { icon: Building2, label: 'Clienti', path: '/clients' },
     { icon: Briefcase, label: 'Campagne', path: '/campaigns' },
-    { icon: Wallet, label: 'Finance', path: '/finance' },
+    { icon: Wallet, label: 'Finanze', path: '/finance' },
   ];
+
+  // Adapt campaignTalents to collaborations shape for legacy page compatibility
+  const collaborationsCompat = campaignTalents.map(ct => ({
+    id: ct.id,
+    talentId: ct.talent_id,
+    brand: '',
+    campaignId: ct.campaign_id,
+    type: '',
+    fee: ct.compenso_lordo,
+    status: ct.stato === 'confermato' ? 'Confermata' : ct.stato === 'consegnato' ? 'Completata' : 'Bozza',
+    paymentStatus: ct.stato === 'pagato' ? 'Saldato' : 'Non Saldato',
+    paidAmount: ct.stato === 'pagato' ? ct.compenso_lordo : 0,
+    notes: ct.note || ''
+  }));
 
   return (
     <div className="flex min-h-screen bg-black text-zinc-100 font-sans selection:bg-blue-500/30">
-      {/* Toast Overlay */}
       <ToastContainer />
 
       {/* Sidebar */}
@@ -139,8 +146,7 @@ const AppContent: React.FC = () => {
               key={item.path}
               icon={item.icon}
               label={item.label}
-              path={item.path}
-              active={location.pathname === item.path}
+              active={location.pathname === item.path || (item.path !== '/' && location.pathname.startsWith(item.path))}
               onClick={() => {
                 navigate(item.path);
                 if (window.innerWidth < 768) setSidebarOpen(false);
@@ -168,7 +174,6 @@ const AppContent: React.FC = () => {
           <SidebarItem
             icon={LogOut}
             label="Esci"
-            path="#"
             active={false}
             onClick={logout}
           />
@@ -177,7 +182,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen relative">
-        {/* Mobile Header */}
+        {/* Header */}
         <header className="sticky top-0 z-30 bg-black/80 backdrop-blur-xl border-b border-white/5 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button onClick={() => setSidebarOpen(!sidebarOpen)} className="p-2 hover:bg-zinc-800 rounded-xl transition-all">
@@ -186,8 +191,6 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center space-x-4">
-            {/* Global Search Trigger (Visual Only for now, or opens modal) */}
-            {/* Notifications */}
             <button className="relative p-2 hover:bg-zinc-800 rounded-xl transition-all group">
               <Bell size={20} className="text-zinc-500 group-hover:text-white" />
               {notifications.filter(n => !n.read).length > 0 && (
@@ -206,49 +209,37 @@ const AppContent: React.FC = () => {
                   <Dashboard
                     appointments={appointments}
                     talents={talents}
-                    collaborations={collaborations}
+                    collaborations={collaborationsCompat as any}
                   />
               } />
               <Route path="/roster" element={
                 isTalent ? <Navigate to="/my-dashboard" /> :
-                  <Roster talents={talents} addTalent={addTalent} importTalentsCSV={importTalentsCSV} />
+                  <Roster />
               } />
-              <Route path="/brands" element={
+              <Route path="/clients" element={
                 isTalent ? <Navigate to="/my-dashboard" /> :
-                  <Brands brands={brands} addBrand={addBrand} updateBrand={updateBrand} deleteBrand={deleteBrand} />
+                  <Clients />
               } />
               <Route path="/roster/:id" element={
                 isTalent ? <Navigate to="/my-dashboard" /> :
                   <TalentProfile
                     talents={talents}
-                    collaborations={collaborations}
+                    collaborations={collaborationsCompat as any}
                     appointments={appointments}
                     campaigns={campaigns}
-                    addCollaboration={addCollaboration}
+                    addCollaboration={addCampaignTalent as any}
                     role={auth.user.role}
                   />
               } />
               <Route path="/campaigns" element={
                 isTalent ? <Navigate to="/my-dashboard" /> :
-                  <Campaigns
-                    campaigns={campaigns}
-                    brands={brands}
-                    addCampaign={addCampaign}
-                    addCollaboration={addCollaboration}
-                    updateCollaboration={updateCollaboration}
-                    income={income}
-                    addIncome={addIncome}
-                    updateIncome={updateIncome}
-                    deleteIncome={deleteIncome}
-                    collaborations={collaborations}
-                    talents={talents}
-                  />
+                  <Campaigns />
               } />
               <Route path="/finance" element={
                 isTalent ? <Navigate to="/my-finance" /> :
                   <Finance
                     campaigns={campaigns}
-                    collaborations={collaborations}
+                    collaborations={collaborationsCompat as any}
                     extraCosts={extraCosts}
                     income={income}
                     role={auth.user.role}
@@ -263,7 +254,7 @@ const AppContent: React.FC = () => {
                     talentId={auth.user.talentId || ''}
                     talents={talents}
                     appointments={appointments}
-                    collaborations={collaborations}
+                    collaborations={collaborationsCompat as any}
                     campaigns={campaigns}
                   />
               } />
@@ -272,7 +263,7 @@ const AppContent: React.FC = () => {
                   <TalentCalendar
                     talentId={auth.user.talentId || ''}
                     appointments={appointments}
-                    collaborations={collaborations}
+                    collaborations={collaborationsCompat as any}
                     campaigns={campaigns}
                   />
               } />
@@ -280,7 +271,7 @@ const AppContent: React.FC = () => {
                 !isTalent ? <Navigate to="/" /> :
                   <Finance
                     campaigns={campaigns}
-                    collaborations={collaborations}
+                    collaborations={collaborationsCompat as any}
                     extraCosts={[]}
                     income={[]}
                     role={auth.user.role}
@@ -305,7 +296,7 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
     super(props);
   }
 
-  static getDerivedStateFromError(error: any) {
+  static getDerivedStateFromError() {
     return { hasError: true };
   }
 
@@ -318,11 +309,11 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { has
       return (
         <div className="min-h-screen bg-black flex items-center justify-center p-10 text-center">
           <div>
-            <h1 className="text-4xl font-black text-white mb-4">Qualcosa è andato storto.</h1>
-            <p className="text-zinc-500 mb-8">Si è verificato un errore imprevisto. Prova a ricaricare la pagina.</p>
+            <h1 className="text-4xl font-black text-white mb-4">Qualcosa e andato storto.</h1>
+            <p className="text-zinc-500 mb-8">Si e verificato un errore imprevisto. Prova a ricaricare la pagina.</p>
             <button
               onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700transition-all"
+              className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 transition-all"
             >
               Ricarica Pagina
             </button>

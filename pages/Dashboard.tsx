@@ -1,476 +1,691 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
-  addMonths, subMonths, startOfWeek, endOfWeek, addDays, isSameMonth,
-  addWeeks, subWeeks, startOfDay, endOfDay, eachHourOfInterval
+  addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, addDays,
+  isToday as isDateToday, isBefore, startOfDay, parseISO
 } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
-  ChevronLeft, ChevronRight, Calendar as CalendarIcon, Filter,
-  Search, Video, Camera, Bell, MessageSquare, Truck, ArrowUpRight,
-  X, Clock, MapPin, User
+  ChevronLeft, ChevronRight, Plus, Check, Trash2, X,
+  AlertTriangle, Clock, Calendar as CalendarIcon, Flag,
+  StickyNote, GripVertical, Pencil
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { Appointment, Talent, Collaboration, AppointmentType } from '../types';
+import { useApp } from '../context/AppContext';
+import { Task, TaskStatus, TaskPriority } from '../types';
 
-interface DashboardProps {
-  appointments: Appointment[];
-  talents: Talent[];
-  collaborations: Collaboration[];
-}
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Bassa',
+  normal: 'Normale',
+  high: 'Alta',
+  urgent: 'Urgente'
+};
 
-type ViewType = 'month' | 'week' | 'day';
+const PRIORITY_COLORS: Record<string, string> = {
+  low: 'text-zinc-500',
+  normal: 'text-blue-400',
+  high: 'text-amber-400',
+  urgent: 'text-red-400'
+};
 
-const Dashboard: React.FC<DashboardProps> = ({ appointments, talents, collaborations }) => {
-  const navigate = useNavigate();
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const [view, setView] = useState<ViewType>('month');
-  const [filters, setFilters] = useState({
-    talentId: 'ALL',
-    type: 'ALL',
-    brand: ''
-  });
-  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+const STATUS_LABELS: Record<string, string> = {
+  todo: 'Da fare',
+  in_progress: 'In corso',
+  done: 'Completata'
+};
 
-  const filteredAppointments = useMemo(() => {
-    return appointments.filter(app => {
-      const matchTalent = filters.talentId === 'ALL' || app.talentId === filters.talentId;
-      const matchType = filters.type === 'ALL' || app.type === filters.type;
-      const matchBrand = filters.brand === '' || app.brand.toLowerCase().includes(filters.brand.toLowerCase());
-      return matchTalent && matchType && matchBrand;
-    });
-  }, [appointments, filters]);
+// Quick-add component for each column
+const QuickAdd: React.FC<{
+  placeholder?: string;
+  onAdd: (title: string) => void;
+}> = ({ placeholder = 'Aggiungi attivita...', onAdd }) => {
+  const [value, setValue] = useState('');
 
-  // Month calendar days
-  const monthCalendarDays = useMemo(() => {
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(monthStart);
-    const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
-    return eachDayOfInterval({ start: startDate, end: endDate });
-  }, [currentDate]);
-
-  // Week calendar days
-  const weekCalendarDays = useMemo(() => {
-    const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-    return eachDayOfInterval({ start: weekStart, end: weekEnd });
-  }, [currentDate]);
-
-  // Day hours
-  const dayHours = useMemo(() => {
-    const start = startOfDay(currentDate);
-    const hours = [];
-    for (let i = 8; i <= 20; i++) {
-      hours.push(addDays(start, 0));
-      hours[hours.length - 1] = new Date(start.getFullYear(), start.getMonth(), start.getDate(), i, 0, 0);
-    }
-    return hours;
-  }, [currentDate]);
-
-  const getTypeIcon = (type: AppointmentType) => {
-    switch (type) {
-      case AppointmentType.SHOOTING: return <Camera size={12} />;
-      case AppointmentType.PUBLICATION: return <Video size={12} />;
-      case AppointmentType.CALL: return <MessageSquare size={12} />;
-      case AppointmentType.DELIVERY: return <Truck size={12} />;
-      default: return <CalendarIcon size={12} />;
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (value.trim()) {
+      onAdd(value.trim());
+      setValue('');
     }
   };
-
-  const getTypeColor = (type: AppointmentType) => {
-    switch (type) {
-      case AppointmentType.SHOOTING: return 'bg-purple-500/10 border-purple-500 text-purple-400';
-      case AppointmentType.PUBLICATION: return 'bg-emerald-500/10 border-emerald-500 text-emerald-400';
-      case AppointmentType.CALL: return 'bg-amber-500/10 border-amber-500 text-amber-400';
-      case AppointmentType.DELIVERY: return 'bg-blue-500/10 border-blue-500 text-blue-400';
-      default: return 'bg-zinc-800 border-zinc-600 text-zinc-400';
-    }
-  };
-
-  const navigateDate = (direction: 'prev' | 'next') => {
-    if (view === 'month') {
-      setCurrentDate(direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
-    } else if (view === 'week') {
-      setCurrentDate(direction === 'prev' ? subWeeks(currentDate, 1) : addWeeks(currentDate, 1));
-    } else {
-      setCurrentDate(direction === 'prev' ? addDays(currentDate, -1) : addDays(currentDate, 1));
-    }
-  };
-
-  const getDateLabel = () => {
-    if (view === 'month') {
-      return format(currentDate, 'MMMM yyyy', { locale: it });
-    } else if (view === 'week') {
-      const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
-      const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
-      return `${format(weekStart, 'd')} - ${format(weekEnd, 'd MMMM yyyy', { locale: it })}`;
-    } else {
-      return format(currentDate, 'EEEE d MMMM yyyy', { locale: it });
-    }
-  };
-
-  // Stats
-  const todayApps = appointments.filter(a => isSameDay(new Date(a.date), new Date())).length;
-  const weekApps = appointments.filter(a => {
-    const appDate = new Date(a.date);
-    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(new Date(), { weekStartsOn: 1 });
-    return appDate >= weekStart && appDate <= weekEnd;
-  }).length;
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
-      {/* Top Operativo */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-[#0c0c0c] p-6 rounded-[2.5rem] border border-white/5 shadow-2xl">
-        <div className="flex items-center space-x-6">
-          <div className="w-14 h-14 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-[0_0_30px_rgba(37,99,235,0.4)]">
-            <CalendarIcon size={28} />
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-white uppercase tracking-tighter leading-none">Calendario Operativo</h1>
-            <p className="text-zinc-500 text-xs font-bold uppercase tracking-widest mt-1">Sincronizzazione Talent & Brand</p>
-          </div>
-        </div>
+    <form onSubmit={handleSubmit} className="flex items-center gap-2 mt-3">
+      <input
+        type="text"
+        value={value}
+        onChange={e => setValue(e.target.value)}
+        placeholder={placeholder}
+        className="flex-1 bg-zinc-900/50 border border-white/5 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-600 focus:border-blue-500/50 focus:outline-none transition-all"
+      />
+      <button
+        type="submit"
+        disabled={!value.trim()}
+        className="p-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-30 disabled:hover:bg-blue-600 text-white rounded-xl transition-all"
+      >
+        <Plus size={14} />
+      </button>
+    </form>
+  );
+};
 
-        <div className="flex items-center bg-zinc-900/50 p-2 rounded-2xl border border-white/5">
-          {(['month', 'week', 'day'] as ViewType[]).map(v => (
-            <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${view === v ? 'bg-white text-black shadow-lg' : 'text-zinc-500 hover:text-white'}`}
-            >
-              {v === 'month' ? 'Mese' : v === 'week' ? 'Settimana' : 'Giorno'}
+// Single task item
+const TaskItem: React.FC<{
+  task: Task;
+  onToggle: () => void;
+  onClick: () => void;
+}> = ({ task, onToggle, onClick }) => {
+  return (
+    <div
+      className={`group flex items-center gap-3 p-3 rounded-xl border transition-all hover:bg-white/[0.02] cursor-pointer ${
+        task.status === 'done'
+          ? 'border-white/5 opacity-50'
+          : task.priority === 'urgent'
+          ? 'border-red-500/20 bg-red-500/[0.03]'
+          : 'border-white/5'
+      }`}
+    >
+      <button
+        onClick={(e) => { e.stopPropagation(); onToggle(); }}
+        className={`flex-shrink-0 w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${
+          task.status === 'done'
+            ? 'bg-emerald-500 border-emerald-500'
+            : 'border-zinc-600 hover:border-blue-500'
+        }`}
+      >
+        {task.status === 'done' && <Check size={12} className="text-white" />}
+      </button>
+
+      <div className="flex-1 min-w-0" onClick={onClick}>
+        <p className={`text-xs font-bold truncate ${task.status === 'done' ? 'line-through text-zinc-600' : 'text-white'}`}>
+          {task.title}
+        </p>
+        {task.description && (
+          <p className="text-[10px] text-zinc-600 truncate mt-0.5">{task.description}</p>
+        )}
+      </div>
+
+      <Flag size={12} className={`flex-shrink-0 ${PRIORITY_COLORS[task.priority] || 'text-zinc-600'}`} />
+    </div>
+  );
+};
+
+// Task detail modal
+const TaskModal: React.FC<{
+  task: Task | null;
+  isNew?: boolean;
+  defaultDate?: string;
+  defaultPriority?: TaskPriority;
+  onClose: () => void;
+  onSave: (data: Partial<Task>) => void;
+  onDelete?: () => void;
+}> = ({ task, isNew, defaultDate, defaultPriority, onClose, onSave, onDelete }) => {
+  const [title, setTitle] = useState(task?.title || '');
+  const [description, setDescription] = useState(task?.description || '');
+  const [dueDate, setDueDate] = useState(task?.due_date || defaultDate || format(new Date(), 'yyyy-MM-dd'));
+  const [status, setStatus] = useState<TaskStatus>(task?.status || TaskStatus.TODO);
+  const [priority, setPriority] = useState<TaskPriority>(task?.priority || defaultPriority || TaskPriority.LOW);
+
+  const handleSave = () => {
+    if (!title.trim()) return;
+    onSave({
+      title: title.trim(),
+      description: description.trim() || undefined,
+      due_date: dueDate,
+      status,
+      priority
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-black/80 backdrop-blur-lg"
+      />
+      <motion.div
+        initial={{ scale: 0.95, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        exit={{ scale: 0.95, opacity: 0 }}
+        className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-lg shadow-3xl overflow-hidden"
+      >
+        <div className="p-6 space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black text-white uppercase tracking-tight">
+              {isNew ? 'Nuova Attivita' : 'Dettagli Attivita'}
+            </h3>
+            <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+              <X size={18} />
             </button>
-          ))}
-        </div>
+          </div>
 
-        <div className="flex items-center space-x-4">
-          <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-blue-500 hover:text-white transition-all">
-            Oggi
-          </button>
-          <div className="flex items-center bg-zinc-950 px-4 py-2 rounded-xl border border-white/5">
-            <button onClick={() => navigateDate('prev')} className="p-2 text-zinc-500 hover:text-white"><ChevronLeft size={20} /></button>
-            <span className="px-4 font-black text-xs text-white uppercase tracking-widest min-w-[180px] text-center">
-              {getDateLabel()}
-            </span>
-            <button onClick={() => navigateDate('next')} className="p-2 text-zinc-500 hover:text-white"><ChevronRight size={20} /></button>
+          <div>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Titolo *</label>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="Titolo attivita..."
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-700 focus:border-blue-500/50 focus:outline-none"
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Descrizione</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Descrizione opzionale..."
+              rows={3}
+              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-700 focus:border-blue-500/50 focus:outline-none resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Data</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={e => setDueDate(e.target.value)}
+                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-blue-500/50 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Stato</label>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value as TaskStatus)}
+                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-blue-500/50 focus:outline-none"
+              >
+                {Object.entries(STATUS_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Priorita</label>
+              <select
+                value={priority}
+                onChange={e => setPriority(e.target.value as TaskPriority)}
+                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:border-blue-500/50 focus:outline-none"
+              >
+                {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              onClick={handleSave}
+              disabled={!title.trim()}
+              className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white font-black uppercase text-[10px] tracking-widest py-3.5 rounded-xl transition-all"
+            >
+              {isNew ? 'Crea Attivita' : 'Salva Modifiche'}
+            </button>
+            {!isNew && onDelete && (
+              <button
+                onClick={() => { onDelete(); onClose(); }}
+                className="p-3.5 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-xl transition-all"
+              >
+                <Trash2 size={16} />
+              </button>
+            )}
           </div>
         </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// Task column section
+const TaskSection: React.FC<{
+  title: string;
+  icon: React.ReactNode;
+  tasks: Task[];
+  emptyMessage?: string;
+  onQuickAdd: (title: string) => void;
+  onToggleTask: (task: Task) => void;
+  onClickTask: (task: Task) => void;
+  accentColor?: string;
+}> = ({ title, icon, tasks, emptyMessage = 'Nessuna attivita', onQuickAdd, onToggleTask, onClickTask, accentColor = 'text-blue-500' }) => {
+  return (
+    <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className={accentColor}>{icon}</span>
+        <h3 className="text-[11px] font-black text-white uppercase tracking-widest">{title}</h3>
+        {tasks.length > 0 && (
+          <span className="ml-auto text-[10px] font-bold text-zinc-600 bg-zinc-900 px-2 py-0.5 rounded-lg">{tasks.length}</span>
+        )}
       </div>
 
-      {/* Stats Bar */}
-      <div className="grid grid-cols-4 gap-6">
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">Oggi</p>
-          <p className="text-3xl font-black text-white">{todayApps}</p>
-        </div>
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">Questa Settimana</p>
-          <p className="text-3xl font-black text-blue-500">{weekApps}</p>
-        </div>
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">Totale Appuntamenti</p>
-          <p className="text-3xl font-black text-emerald-500">{appointments.length}</p>
-        </div>
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-1">Talent Attivi</p>
-          <p className="text-3xl font-black text-purple-500">{talents.filter(t => t.status === 'active').length}</p>
-        </div>
+      <div className="space-y-1.5 max-h-[280px] overflow-y-auto custom-scrollbar">
+        {tasks.length === 0 ? (
+          <p className="text-[10px] text-zinc-700 py-4 text-center italic">{emptyMessage}</p>
+        ) : (
+          tasks.map(task => (
+            <TaskItem key={task.id} task={task} onToggle={() => onToggleTask(task)} onClick={() => onClickTask(task)} />
+          ))
+        )}
       </div>
 
-      {/* Filtri Avanzati */}
-      <div className="flex flex-wrap items-center gap-4">
-        <div className="flex items-center space-x-3 bg-zinc-900/30 px-4 py-3 rounded-2xl border border-white/5">
-          <Filter size={16} className="text-blue-500" />
-          <select
-            className="bg-transparent border-none text-[10px] font-black text-zinc-400 uppercase tracking-widest focus:ring-0 cursor-pointer outline-none"
-            value={filters.talentId}
-            onChange={e => setFilters({ ...filters, talentId: e.target.value })}
-          >
-            <option value="ALL">Tutti i Talent</option>
-            {talents.map(t => <option key={t.id} value={t.id}>{t.stageName}</option>)}
-          </select>
-        </div>
+      <QuickAdd onAdd={onQuickAdd} />
+    </div>
+  );
+};
 
-        <div className="flex items-center space-x-3 bg-zinc-900/30 px-4 py-3 rounded-2xl border border-white/5">
-          <select
-            className="bg-transparent border-none text-[10px] font-black text-zinc-400 uppercase tracking-widest focus:ring-0 cursor-pointer outline-none"
-            value={filters.type}
-            onChange={e => setFilters({ ...filters, type: e.target.value })}
-          >
-            <option value="ALL">Tutte le Tipologie</option>
-            {Object.values(AppointmentType).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-        </div>
+// Main Dashboard component
+interface DashboardProps {
+  appointments: any[];
+  talents: any[];
+  collaborations: any[];
+}
 
-        <div className="flex-1 flex items-center bg-zinc-900/30 px-5 py-3 rounded-2xl border border-white/5 focus-within:border-blue-500/50 transition-all">
-          <Search size={16} className="text-zinc-600 mr-3" />
-          <input
-            type="text"
-            placeholder="CERCA BRAND O CLIENTE..."
-            className="bg-transparent border-none text-[10px] font-black text-white placeholder-zinc-700 w-full focus:ring-0 uppercase tracking-widest outline-none"
-            value={filters.brand}
-            onChange={e => setFilters({ ...filters, brand: e.target.value })}
+const Dashboard: React.FC<DashboardProps> = () => {
+  const { tasks, addTask, updateTask, deleteTask, homeNote, updateHomeNote } = useApp();
+
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  const [newTaskDefaults, setNewTaskDefaults] = useState<{ date?: string; priority?: TaskPriority }>({});
+  const [noteText, setNoteText] = useState(homeNote?.note_text || '');
+  const [noteEditing, setNoteEditing] = useState(false);
+  const [urgentSubTab, setUrgentSubTab] = useState<'urgent' | 'week'>('urgent');
+
+  // Calendar filter state
+  const [calendarFilters, setCalendarFilters] = useState({
+    status: 'ALL',
+    priority: 'ALL'
+  });
+
+  // Sync note text when homeNote updates
+  React.useEffect(() => {
+    if (homeNote?.note_text && !noteEditing) {
+      setNoteText(homeNote.note_text);
+    }
+  }, [homeNote?.note_text]);
+
+  const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+  const tomorrow = useMemo(() => format(addDays(new Date(), 1), 'yyyy-MM-dd'), []);
+  const dayAfterTomorrow = useMemo(() => format(addDays(new Date(), 2), 'yyyy-MM-dd'), []);
+  const nextWeekEnd = useMemo(() => format(addDays(new Date(), 7), 'yyyy-MM-dd'), []);
+
+  // Filter tasks for each column
+  const activeTasks = useMemo(() => tasks.filter(t => t.status !== 'done'), [tasks]);
+
+  const todayTasks = useMemo(() =>
+    activeTasks.filter(t => t.due_date === today),
+    [activeTasks, today]
+  );
+
+  const tomorrowTasks = useMemo(() =>
+    activeTasks.filter(t => t.due_date === tomorrow),
+    [activeTasks, tomorrow]
+  );
+
+  const dayAfterTomorrowTasks = useMemo(() =>
+    activeTasks.filter(t => t.due_date === dayAfterTomorrow),
+    [activeTasks, dayAfterTomorrow]
+  );
+
+  const urgentTasks = useMemo(() =>
+    activeTasks.filter(t => t.priority === 'urgent' || (t.due_date && t.due_date < today)),
+    [activeTasks, today]
+  );
+
+  const nextWeekTasks = useMemo(() =>
+    activeTasks.filter(t => t.due_date && t.due_date >= today && t.due_date <= nextWeekEnd),
+    [activeTasks, today, nextWeekEnd]
+  );
+
+  // Calendar tasks (all, for dot display)
+  const calendarFilteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (calendarFilters.status !== 'ALL' && t.status !== calendarFilters.status) return false;
+      if (calendarFilters.priority !== 'ALL' && t.priority !== calendarFilters.priority) return false;
+      return true;
+    });
+  }, [tasks, calendarFilters]);
+
+  // Calendar days
+  const calendarDays = useMemo(() => {
+    const monthStart = startOfMonth(currentMonth);
+    const monthEnd = endOfMonth(monthStart);
+    const calStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const calEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    return eachDayOfInterval({ start: calStart, end: calEnd });
+  }, [currentMonth]);
+
+  const handleQuickAdd = useCallback(async (title: string, dueDate: string, priority: TaskPriority = TaskPriority.LOW) => {
+    await addTask({
+      title,
+      due_date: dueDate,
+      status: TaskStatus.TODO,
+      priority
+    } as any);
+  }, [addTask]);
+
+  const handleToggleTask = useCallback(async (task: Task) => {
+    const newStatus = task.status === 'done' ? TaskStatus.TODO : TaskStatus.DONE;
+    await updateTask(task.id, { status: newStatus });
+  }, [updateTask]);
+
+  const handleSaveTask = useCallback(async (data: Partial<Task>) => {
+    if (selectedTask) {
+      await updateTask(selectedTask.id, data);
+    } else {
+      await addTask(data as any);
+    }
+  }, [selectedTask, updateTask, addTask]);
+
+  const handleDeleteTask = useCallback(async () => {
+    if (selectedTask) {
+      await deleteTask(selectedTask.id);
+      setSelectedTask(null);
+    }
+  }, [selectedTask, deleteTask]);
+
+  const handleSaveNote = useCallback(async () => {
+    await updateHomeNote(noteText);
+    setNoteEditing(false);
+  }, [noteText, updateHomeNote]);
+
+  const handleCalendarDayClick = useCallback((day: Date) => {
+    const dateStr = format(day, 'yyyy-MM-dd');
+    setNewTaskDefaults({ date: dateStr });
+    setShowNewTaskModal(true);
+  }, []);
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-white uppercase tracking-tighter">Home</h1>
+          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">
+            {format(new Date(), 'EEEE d MMMM yyyy', { locale: it })}
+          </p>
+        </div>
+        <button
+          onClick={() => { setNewTaskDefaults({}); setShowNewTaskModal(true); }}
+          className="flex items-center gap-2 px-5 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-lg shadow-blue-500/20"
+        >
+          <Plus size={14} />
+          Nuova Attivita
+        </button>
+      </div>
+
+      {/* 2-column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6">
+        {/* LEFT: 4 task sections */}
+        <div className="space-y-4">
+          {/* OGGI */}
+          <TaskSection
+            title="Oggi"
+            icon={<CalendarIcon size={16} />}
+            tasks={todayTasks}
+            emptyMessage="Nessuna attivita per oggi"
+            onQuickAdd={(title) => handleQuickAdd(title, today)}
+            onToggleTask={handleToggleTask}
+            onClickTask={(t) => setSelectedTask(t)}
+            accentColor="text-blue-500"
           />
-        </div>
-      </div>
 
-      {/* Calendario Grid */}
-      <div className="bg-[#0c0c0c] border border-white/5 rounded-[3rem] overflow-hidden shadow-3xl relative">
-        {/* SVG Decorative Background */}
-        <div className="absolute top-0 right-0 p-12 opacity-[0.02] pointer-events-none">
-          <svg width="400" height="400" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="100" cy="100" r="80" stroke="white" strokeWidth="1" strokeDasharray="10 10" />
-            <rect x="60" y="60" width="80" height="80" stroke="white" strokeWidth="0.5" />
-          </svg>
+          {/* DOMANI */}
+          <TaskSection
+            title="Domani"
+            icon={<Clock size={16} />}
+            tasks={tomorrowTasks}
+            emptyMessage="Nessuna attivita per domani"
+            onQuickAdd={(title) => handleQuickAdd(title, tomorrow)}
+            onToggleTask={handleToggleTask}
+            onClickTask={(t) => setSelectedTask(t)}
+            accentColor="text-emerald-500"
+          />
+
+          {/* DOPODOMANI */}
+          <TaskSection
+            title="Dopodomani"
+            icon={<Clock size={16} />}
+            tasks={dayAfterTomorrowTasks}
+            emptyMessage="Nessuna attivita per dopodomani"
+            onQuickAdd={(title) => handleQuickAdd(title, dayAfterTomorrow)}
+            onToggleTask={handleToggleTask}
+            onClickTask={(t) => setSelectedTask(t)}
+            accentColor="text-purple-500"
+          />
+
+          {/* URGENZE & PROSSIMA SETTIMANA */}
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle size={16} className="text-red-400" />
+              <h3 className="text-[11px] font-black text-white uppercase tracking-widest">Urgenze & Prossima Settimana</h3>
+            </div>
+
+            {/* Sub-tabs */}
+            <div className="flex gap-1 mb-3 bg-zinc-900/50 p-1 rounded-xl">
+              <button
+                onClick={() => setUrgentSubTab('urgent')}
+                className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  urgentSubTab === 'urgent' ? 'bg-red-500/20 text-red-400' : 'text-zinc-600 hover:text-zinc-400'
+                }`}
+              >
+                Urgenti / Scadute ({urgentTasks.length})
+              </button>
+              <button
+                onClick={() => setUrgentSubTab('week')}
+                className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
+                  urgentSubTab === 'week' ? 'bg-blue-500/20 text-blue-400' : 'text-zinc-600 hover:text-zinc-400'
+                }`}
+              >
+                Prossimi 7 Giorni ({nextWeekTasks.length})
+              </button>
+            </div>
+
+            <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar">
+              {urgentSubTab === 'urgent' ? (
+                urgentTasks.length === 0 ? (
+                  <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna urgenza</p>
+                ) : (
+                  urgentTasks.map(task => (
+                    <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                  ))
+                )
+              ) : (
+                nextWeekTasks.length === 0 ? (
+                  <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna attivita nei prossimi 7 giorni</p>
+                ) : (
+                  nextWeekTasks.map(task => (
+                    <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                  ))
+                )
+              )}
+            </div>
+
+            <QuickAdd onAdd={(title) => handleQuickAdd(title, today, TaskPriority.URGENT)} />
+
+            {/* NOTE FISSATE */}
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <StickyNote size={14} className="text-amber-400" />
+                  <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Note Fissate</span>
+                </div>
+                {!noteEditing ? (
+                  <button onClick={() => setNoteEditing(true)} className="p-1.5 hover:bg-zinc-900 rounded-lg transition-all">
+                    <Pencil size={12} className="text-zinc-600" />
+                  </button>
+                ) : (
+                  <button onClick={handleSaveNote} className="text-[10px] font-black text-blue-500 hover:text-blue-400 uppercase tracking-widest">
+                    Salva
+                  </button>
+                )}
+              </div>
+              {noteEditing ? (
+                <textarea
+                  value={noteText}
+                  onChange={e => setNoteText(e.target.value)}
+                  placeholder="Scrivi le tue note qui..."
+                  rows={4}
+                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-zinc-700 focus:border-amber-500/50 focus:outline-none resize-none"
+                  autoFocus
+                />
+              ) : (
+                <div
+                  onClick={() => setNoteEditing(true)}
+                  className="min-h-[60px] bg-zinc-900/30 rounded-xl px-3 py-2 text-xs text-zinc-400 cursor-pointer hover:bg-zinc-900/50 transition-all whitespace-pre-wrap"
+                >
+                  {noteText || <span className="italic text-zinc-700">Clicca per aggiungere note...</span>}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
 
-        {view === 'month' && (
-          <>
-            <div className="grid grid-cols-7 bg-zinc-900/40 backdrop-blur-md relative z-10 border-b border-white/5">
-              {['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map(day => (
-                <div key={day} className="py-6 text-center text-[10px] font-black text-zinc-500 uppercase tracking-[0.3em]">{day}</div>
+        {/* RIGHT: Calendar */}
+        <div className="space-y-4">
+          <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4 sticky top-28">
+            {/* Calendar header */}
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-xs font-black text-white uppercase tracking-widest">
+                {format(currentMonth, 'MMMM yyyy', { locale: it })}
+              </span>
+              <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+
+            {/* Filters row */}
+            <div className="flex gap-2 mb-3">
+              <select
+                value={calendarFilters.status}
+                onChange={e => setCalendarFilters(p => ({ ...p, status: e.target.value }))}
+                className="flex-1 bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
+              >
+                <option value="ALL">Tutti gli stati</option>
+                <option value="todo">Da fare</option>
+                <option value="in_progress">In corso</option>
+                <option value="done">Completate</option>
+              </select>
+              <select
+                value={calendarFilters.priority}
+                onChange={e => setCalendarFilters(p => ({ ...p, priority: e.target.value }))}
+                className="flex-1 bg-zinc-900/50 border border-white/5 rounded-lg px-2 py-1.5 text-[10px] font-bold text-zinc-400 uppercase focus:outline-none"
+              >
+                <option value="ALL">Tutte le priorita</option>
+                <option value="low">Bassa</option>
+                <option value="normal">Normale</option>
+                <option value="high">Alta</option>
+                <option value="urgent">Urgente</option>
+              </select>
+            </div>
+
+            {/* Weekday headers */}
+            <div className="grid grid-cols-7 mb-1">
+              {['Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa', 'Do'].map(d => (
+                <div key={d} className="text-center text-[9px] font-black text-zinc-600 uppercase tracking-widest py-2">{d}</div>
               ))}
             </div>
 
-            <div className="grid grid-cols-7 relative z-10">
-              {monthCalendarDays.map((day, idx) => {
-                const dayApps = filteredAppointments.filter(app => isSameDay(new Date(app.date), day));
-                const isToday = isSameDay(day, new Date());
-                const currentMonth = isSameMonth(day, currentDate);
+            {/* Calendar grid */}
+            <div className="grid grid-cols-7">
+              {calendarDays.map((day, idx) => {
+                const dateStr = format(day, 'yyyy-MM-dd');
+                const dayTasks = calendarFilteredTasks.filter(t => t.due_date === dateStr);
+                const isToday = isDateToday(day);
+                const inMonth = isSameMonth(day, currentMonth);
 
                 return (
                   <div
                     key={idx}
-                    className={`min-h-[160px] p-4 border-r border-b border-white/5 transition-all group hover:bg-zinc-800/30 ${!currentMonth ? 'opacity-20' : ''}`}
+                    onClick={() => handleCalendarDayClick(day)}
+                    className={`relative p-1.5 text-center cursor-pointer rounded-lg transition-all hover:bg-zinc-900/50 ${
+                      !inMonth ? 'opacity-20' : ''
+                    }`}
                   >
-                    <div className="flex justify-between items-center mb-4">
-                      <span className={`text-[11px] font-black w-8 h-8 flex items-center justify-center rounded-xl transition-all ${isToday ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 group-hover:text-white'}`}>
-                        {format(day, 'd')}
-                      </span>
-                      {dayApps.length > 0 && currentMonth && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                      )}
-                    </div>
+                    <span className={`text-[11px] font-black w-7 h-7 flex items-center justify-center mx-auto rounded-lg ${
+                      isToday ? 'bg-blue-600 text-white' : 'text-zinc-400'
+                    }`}>
+                      {format(day, 'd')}
+                    </span>
 
-                    <div className="space-y-2">
-                      {dayApps.slice(0, 3).map(app => (
-                        <motion.div
-                          layoutId={app.id}
-                          key={app.id}
-                          onClick={() => setSelectedAppointment(app)}
-                          className={`flex flex-col p-2 rounded-xl text-[9px] font-black border-l-2 cursor-pointer transition-all hover:translate-x-1 ${getTypeColor(app.type)}`}
-                        >
-                          <div className="flex items-center space-x-1 mb-0.5">
-                            {getTypeIcon(app.type)}
-                            <span className="truncate">{app.brand}</span>
-                          </div>
-                          <span className="text-white truncate">@{app.talentName}</span>
-                        </motion.div>
-                      ))}
-                      {dayApps.length > 3 && (
-                        <div className="text-[9px] font-black text-zinc-600 text-center">
-                          +{dayApps.length - 3} altri
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {view === 'week' && (
-          <>
-            <div className="grid grid-cols-7 bg-zinc-900/40 backdrop-blur-md relative z-10 border-b border-white/5">
-              {weekCalendarDays.map((day, idx) => {
-                const isToday = isSameDay(day, new Date());
-                return (
-                  <div key={idx} className={`py-6 text-center border-r border-white/5 last:border-0 ${isToday ? 'bg-blue-600/10' : ''}`}>
-                    <p className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">{format(day, 'EEE', { locale: it })}</p>
-                    <p className={`text-2xl font-black mt-2 ${isToday ? 'text-blue-500' : 'text-white'}`}>{format(day, 'd')}</p>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="grid grid-cols-7 relative z-10 min-h-[500px]">
-              {weekCalendarDays.map((day, idx) => {
-                const dayApps = filteredAppointments.filter(app => isSameDay(new Date(app.date), day));
-                const isToday = isSameDay(day, new Date());
-
-                return (
-                  <div
-                    key={idx}
-                    className={`p-4 border-r border-white/5 last:border-0 ${isToday ? 'bg-blue-600/5' : ''}`}
-                  >
-                    <div className="space-y-3">
-                      {dayApps.map(app => (
-                        <motion.div
-                          key={app.id}
-                          onClick={() => setSelectedAppointment(app)}
-                          className={`p-4 rounded-2xl border cursor-pointer transition-all hover:scale-[1.02] ${getTypeColor(app.type)}`}
-                        >
-                          <div className="flex items-center space-x-2 mb-2">
-                            {getTypeIcon(app.type)}
-                            <span className="text-[10px] font-black uppercase tracking-widest">{app.type}</span>
-                          </div>
-                          <h4 className="text-sm font-black text-white uppercase">{app.brand}</h4>
-                          <p className="text-[10px] text-zinc-400 mt-1">@{app.talentName}</p>
-                          <div className="flex items-center space-x-2 mt-3 text-[9px] text-zinc-500">
-                            <Clock size={10} />
-                            <span>{format(new Date(app.date), 'HH:mm')}</span>
-                          </div>
-                        </motion.div>
-                      ))}
-                      {dayApps.length === 0 && (
-                        <div className="py-20 text-center opacity-20">
-                          <CalendarIcon size={24} className="mx-auto" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
-        {view === 'day' && (
-          <div className="relative z-10">
-            <div className="p-6 border-b border-white/5 bg-zinc-900/20">
-              <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Appuntamenti del giorno</p>
-              <h2 className="text-2xl font-black text-white mt-1">{format(currentDate, 'EEEE d MMMM', { locale: it })}</h2>
-            </div>
-            <div className="divide-y divide-white/5">
-              {dayHours.map((hour, idx) => {
-                const hourApps = filteredAppointments.filter(app => {
-                  const appDate = new Date(app.date);
-                  return isSameDay(appDate, currentDate) && appDate.getHours() === hour.getHours();
-                });
-
-                return (
-                  <div key={idx} className="flex min-h-[80px]">
-                    <div className="w-24 p-4 text-right border-r border-white/5">
-                      <span className="text-[11px] font-black text-zinc-600">{format(hour, 'HH:mm')}</span>
-                    </div>
-                    <div className="flex-1 p-4">
-                      <div className="space-y-2">
-                        {hourApps.map(app => (
-                          <motion.div
-                            key={app.id}
-                            onClick={() => setSelectedAppointment(app)}
-                            className={`flex items-center justify-between p-4 rounded-2xl border cursor-pointer transition-all hover:scale-[1.01] ${getTypeColor(app.type)}`}
-                          >
-                            <div className="flex items-center space-x-4">
-                              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                                {getTypeIcon(app.type)}
-                              </div>
-                              <div>
-                                <h4 className="text-sm font-black text-white uppercase">{app.brand}</h4>
-                                <p className="text-[10px] text-zinc-400">@{app.talentName} • {app.type}</p>
-                              </div>
-                            </div>
-                            <ArrowUpRight size={16} className="text-zinc-600" />
-                          </motion.div>
+                    {/* Task dots */}
+                    {dayTasks.length > 0 && inMonth && (
+                      <div className="flex items-center justify-center gap-0.5 mt-1 min-h-[6px]">
+                        {dayTasks.slice(0, 4).map((t, i) => (
+                          <div
+                            key={i}
+                            className={`w-1.5 h-1.5 rounded-full ${
+                              t.priority === 'urgent' ? 'bg-red-400' :
+                              t.priority === 'high' ? 'bg-amber-400' :
+                              t.status === 'done' ? 'bg-emerald-500' :
+                              'bg-blue-400'
+                            }`}
+                          />
                         ))}
+                        {dayTasks.length > 4 && (
+                          <span className="text-[7px] text-zinc-600 font-bold">+{dayTasks.length - 4}</span>
+                        )}
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
+            </div>
+
+            {/* Today's tasks preview */}
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest mb-2">
+                Attivita di oggi ({todayTasks.length})
+              </p>
+              <div className="space-y-1.5 max-h-[200px] overflow-y-auto custom-scrollbar">
+                {todayTasks.length === 0 ? (
+                  <p className="text-[10px] text-zinc-700 py-3 text-center italic">Nessuna attivita per oggi</p>
+                ) : (
+                  todayTasks.map(task => (
+                    <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Quick View Modal */}
+      {/* Task Detail Modal */}
       <AnimatePresence>
-        {selectedAppointment && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setSelectedAppointment(null)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-lg"
-            />
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="relative bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] w-full max-w-md shadow-3xl overflow-hidden"
-            >
-              <div className="p-8">
-                <div className="flex items-center justify-between mb-8">
-                  <span className={`px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest ${getTypeColor(selectedAppointment.type)}`}>
-                    {selectedAppointment.type}
-                  </span>
-                  <button onClick={() => setSelectedAppointment(null)} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-                    <X size={20} />
-                  </button>
-                </div>
+        {selectedTask && (
+          <TaskModal
+            task={selectedTask}
+            onClose={() => setSelectedTask(null)}
+            onSave={handleSaveTask}
+            onDelete={handleDeleteTask}
+          />
+        )}
+      </AnimatePresence>
 
-                <h3 className="text-3xl font-black text-white uppercase tracking-tighter mb-2">{selectedAppointment.brand}</h3>
-                <p className="text-zinc-500 font-bold">{selectedAppointment.description || 'Appuntamento programmato'}</p>
-
-                <div className="mt-8 space-y-4">
-                  <div className="flex items-center space-x-4 p-4 bg-zinc-900/50 rounded-2xl">
-                    <User size={18} className="text-blue-500" />
-                    <div>
-                      <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Talent</p>
-                      <p className="text-sm font-bold text-white">{selectedAppointment.talentName}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4 p-4 bg-zinc-900/50 rounded-2xl">
-                    <CalendarIcon size={18} className="text-emerald-500" />
-                    <div>
-                      <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Data & Ora</p>
-                      <p className="text-sm font-bold text-white">{format(new Date(selectedAppointment.date), 'EEEE d MMMM yyyy - HH:mm', { locale: it })}</p>
-                    </div>
-                  </div>
-                  {selectedAppointment.deadline && (
-                    <div className="flex items-center space-x-4 p-4 bg-red-500/10 rounded-2xl border border-red-500/20">
-                      <Clock size={18} className="text-red-500" />
-                      <div>
-                        <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Scadenza Consegna</p>
-                        <p className="text-sm font-bold text-white">{format(new Date(selectedAppointment.deadline), 'd MMMM yyyy', { locale: it })}</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex items-center space-x-4 p-4 bg-zinc-900/50 rounded-2xl">
-                    <div className={`w-3 h-3 rounded-full ${selectedAppointment.status === 'completed' ? 'bg-emerald-500' : selectedAppointment.status === 'cancelled' ? 'bg-red-500' : 'bg-blue-500'}`} />
-                    <div>
-                      <p className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Status</p>
-                      <p className="text-sm font-bold text-white capitalize">{selectedAppointment.status}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-8 flex space-x-4">
-                  <button
-                    onClick={() => {
-                      navigate(`/roster/${selectedAppointment.talentId}`);
-                      setSelectedAppointment(null);
-                    }}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-widest py-4 rounded-2xl transition-all"
-                  >
-                    Vai al Talent
-                  </button>
-                  <button
-                    onClick={() => setSelectedAppointment(null)}
-                    className="flex-1 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 font-black uppercase text-xs tracking-widest py-4 rounded-2xl transition-all"
-                  >
-                    Chiudi
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
+      {/* New Task Modal */}
+      <AnimatePresence>
+        {showNewTaskModal && (
+          <TaskModal
+            task={null}
+            isNew
+            defaultDate={newTaskDefaults.date}
+            defaultPriority={newTaskDefaults.priority}
+            onClose={() => setShowNewTaskModal(false)}
+            onSave={handleSaveTask}
+          />
         )}
       </AnimatePresence>
     </motion.div>

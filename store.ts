@@ -1,5 +1,5 @@
 
-import { Talent, Campaign, Collaboration, Appointment, AppointmentType, CollaborationStatus, CampaignStatus, ExtraCost, Income, PaymentStatus } from './types';
+import { Talent, Campaign, Appointment, AppointmentType, CampaignStatus, ExtraCost, Income } from './types';
 
 export const INITIAL_TALENTS: Talent[] = [
   {
@@ -22,7 +22,6 @@ export const INITIAL_TALENTS: Talent[] = [
       'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&q=80&w=400',
       'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=400'
     ],
-    // Added missing attachments property
     attachments: []
   },
   {
@@ -45,7 +44,6 @@ export const INITIAL_TALENTS: Talent[] = [
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=400',
       'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&q=80&w=400'
     ],
-    // Added missing attachments property
     attachments: []
   }
 ];
@@ -55,6 +53,7 @@ export const INITIAL_CAMPAIGNS: Campaign[] = [
     id: 'c-1',
     name: 'Winter Collection 2024',
     brand: 'Amazon Fashion',
+    tipo: 'Brand',
     period: 'Nov 2024 - Gen 2025',
     deadline: '2025-01-31',
     totalBudget: 45000,
@@ -65,47 +64,12 @@ export const INITIAL_CAMPAIGNS: Campaign[] = [
     id: 'c-2',
     name: 'Gaming Nights 25',
     brand: 'Sony PlayStation',
+    tipo: 'Brand',
     period: 'Dic 2024 - Feb 2025',
     deadline: '2025-02-28',
     totalBudget: 60000,
     agencyFeePercent: 15,
     status: CampaignStatus.ACTIVE
-  }
-];
-
-export const INITIAL_COLLABORATIONS: Collaboration[] = [
-  {
-    id: 'col-1',
-    talentId: 't-1',
-    brand: 'Amazon Fashion',
-    campaignId: 'c-1',
-    type: '1 Reels + 3 Stories',
-    deadline: '2024-12-24',
-    fee: 3500,
-    status: CollaborationStatus.CONFIRMED,
-    paymentStatus: PaymentStatus.UNPAID
-  },
-  {
-    id: 'col-2',
-    talentId: 't-1',
-    brand: 'Sony PlayStation',
-    campaignId: 'c-2',
-    type: 'Twitch Stream Integration',
-    deadline: '2025-01-15',
-    fee: 4200,
-    status: CollaborationStatus.COMPLETED,
-    paymentStatus: PaymentStatus.PAID
-  },
-  {
-    id: 'col-3',
-    talentId: 't-2',
-    brand: 'Amazon Fashion',
-    campaignId: 'c-1',
-    type: 'Content Creation (Photos)',
-    deadline: '2024-12-20',
-    fee: 2800,
-    status: CollaborationStatus.CONFIRMED,
-    paymentStatus: PaymentStatus.UNPAID
   }
 ];
 
@@ -142,8 +106,6 @@ export const INITIAL_INCOME: Income[] = [
 ];
 
 export const INITIAL_EXTRA_COSTS: ExtraCost[] = [
-  // Corrected category to lowercase 'videomaker'
   { id: 'ex-1', campaignId: 'c-1', category: 'videomaker', amount: 1500, date: '2024-11-15', status: 'paid' },
-  // Corrected 'Noleggio Luci' to 'luci'
   { id: 'ex-2', campaignId: 'c-1', category: 'luci', amount: 500, date: '2024-11-15', status: 'paid' }
 ];

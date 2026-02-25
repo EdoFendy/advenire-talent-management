@@ -48,6 +48,9 @@ export const talentsApi = {
     getCredentials: (id: string) =>
         apiRequest<{ username: string, email: string, password: string }>(`/talents/${id}/credentials`),
 
+    getFinance: (id: string) =>
+        apiRequest<any>(`/talents/${id}/finance`),
+
     uploadFile: async (id: string, type: 'gallery' | 'attachments' | 'photo', file: File, metadata?: any) => {
         const formData = new FormData();
         formData.append('file', file);
@@ -69,7 +72,7 @@ export const talentsApi = {
         return response.json();
     },
 
-    importCSV: async (file: File) => {
+    importExcel: async (file: File) => {
         const formData = new FormData();
         formData.append('file', file);
 
@@ -84,46 +87,39 @@ export const talentsApi = {
         }
         return response.json();
     },
+
+    importMapped: (rows: Record<string, string>[]) =>
+        apiRequest<any>('/talents/import', {
+            method: 'POST',
+            body: JSON.stringify({ rows }),
+        }),
 };
 
-// ============== BRANDS API ==============
-export const brandsApi = {
-    getAll: () => apiRequest<any[]>('/brands'),
+// ============== CLIENTS API ==============
+export const clientsApi = {
+    getAll: () => apiRequest<any[]>('/clients'),
 
-    getById: (id: string) => apiRequest<any>(`/brands/${id}`),
+    getById: (id: string) => apiRequest<any>(`/clients/${id}`),
 
-    create: (brand: any) =>
-        apiRequest<any>('/brands', {
+    create: (client: any) =>
+        apiRequest<any>('/clients', {
             method: 'POST',
-            body: JSON.stringify(brand),
+            body: JSON.stringify(client),
         }),
 
     update: (id: string, updates: any) =>
-        apiRequest<any>(`/brands/${id}`, {
+        apiRequest<any>(`/clients/${id}`, {
             method: 'PUT',
             body: JSON.stringify(updates),
         }),
 
     delete: (id: string) =>
-        apiRequest<{ success: boolean }>(`/brands/${id}`, {
+        apiRequest<{ success: boolean }>(`/clients/${id}`, {
             method: 'DELETE',
         }),
 
-    uploadLogo: async (id: string, file: File) => {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch(`${API_BASE}/brands/${id}/upload/logo`, {
-            method: 'POST',
-            body: formData,
-        });
-
-        if (!response.ok) {
-            throw new Error('Upload failed');
-        }
-
-        return response.json();
-    },
+    getCampaigns: (id: string) =>
+        apiRequest<any[]>(`/clients/${id}/campaigns`),
 };
 
 // ============== CAMPAIGNS API ==============
@@ -132,7 +128,7 @@ export const campaignsApi = {
 
     getById: (id: string) => apiRequest<any>(`/campaigns/${id}`),
 
-    create: (data: { campaign: any; linkTalent?: any }) =>
+    create: (data: any) =>
         apiRequest<any>('/campaigns', {
             method: 'POST',
             body: JSON.stringify(data),
@@ -150,31 +146,75 @@ export const campaignsApi = {
         }),
 };
 
-// ============== COLLABORATIONS API ==============
-export const collaborationsApi = {
-    getAll: (filters?: { talentId?: string; campaignId?: string }) => {
+// ============== CAMPAIGN TALENTS API ==============
+export const campaignTalentsApi = {
+    getAll: (filters?: { campaignId?: string; talentId?: string }) => {
         const params = new URLSearchParams();
-        if (filters?.talentId) params.set('talentId', filters.talentId);
         if (filters?.campaignId) params.set('campaignId', filters.campaignId);
+        if (filters?.talentId) params.set('talentId', filters.talentId);
         const query = params.toString() ? `?${params.toString()}` : '';
-        return apiRequest<any[]>(`/collaborations${query}`);
+        return apiRequest<any[]>(`/campaign-talents${query}`);
     },
 
-    create: (data: { collaboration: any; appointments?: any[] }) =>
-        apiRequest<any>('/collaborations', {
+    create: (data: any) =>
+        apiRequest<any>('/campaign-talents', {
             method: 'POST',
             body: JSON.stringify(data),
         }),
 
     update: (id: string, updates: any) =>
-        apiRequest<any>(`/collaborations/${id}`, {
+        apiRequest<any>(`/campaign-talents/${id}`, {
             method: 'PUT',
             body: JSON.stringify(updates),
         }),
 
     delete: (id: string) =>
-        apiRequest<{ success: boolean }>(`/collaborations/${id}`, {
+        apiRequest<{ success: boolean }>(`/campaign-talents/${id}`, {
             method: 'DELETE',
+        }),
+};
+
+// ============== TASKS API ==============
+export const tasksApi = {
+    getAll: (filters?: { status?: string; priority?: string; due_date?: string; due_date_from?: string; due_date_to?: string; related_type?: string }) => {
+        const params = new URLSearchParams();
+        if (filters) {
+            Object.entries(filters).forEach(([key, value]) => {
+                if (value) params.set(key, value);
+            });
+        }
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return apiRequest<any[]>(`/tasks${query}`);
+    },
+
+    getById: (id: string) => apiRequest<any>(`/tasks/${id}`),
+
+    create: (task: any) =>
+        apiRequest<any>('/tasks', {
+            method: 'POST',
+            body: JSON.stringify(task),
+        }),
+
+    update: (id: string, updates: any) =>
+        apiRequest<any>(`/tasks/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+        }),
+
+    delete: (id: string) =>
+        apiRequest<{ success: boolean }>(`/tasks/${id}`, {
+            method: 'DELETE',
+        }),
+};
+
+// ============== HOME NOTES API ==============
+export const homeNotesApi = {
+    get: () => apiRequest<any>('/home-notes'),
+
+    update: (noteText: string) =>
+        apiRequest<any>('/home-notes', {
+            method: 'PUT',
+            body: JSON.stringify({ note_text: noteText }),
         }),
 };
 
@@ -276,6 +316,38 @@ export const notificationsApi = {
     },
 };
 
+// ============== QUOTES API ==============
+export const quotesApi = {
+    getAll: (filters?: { client_id?: string; stato?: string }) => {
+        const params = new URLSearchParams();
+        if (filters?.client_id) params.set('client_id', filters.client_id);
+        if (filters?.stato) params.set('stato', filters.stato);
+        const query = params.toString() ? `?${params.toString()}` : '';
+        return apiRequest<any[]>(`/quotes${query}`);
+    },
+
+    getById: (id: string) => apiRequest<any>(`/quotes/${id}`),
+
+    create: (data: any) =>
+        apiRequest<any>('/quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        }),
+
+    update: (id: string, updates: any) =>
+        apiRequest<any>(`/quotes/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updates),
+        }),
+
+    delete: (id: string) =>
+        apiRequest<{ success: boolean }>(`/quotes/${id}`, {
+            method: 'DELETE',
+        }),
+};
+
 // ============== SEARCH API ==============
 export const searchApi = {
     global: (query: string) => apiRequest<any[]>(`/search?q=${encodeURIComponent(query)}`),
@@ -289,12 +361,15 @@ export const analyticsApi = {
 // Export all APIs
 export const api = {
     talents: talentsApi,
-    brands: brandsApi,
+    clients: clientsApi,
     campaigns: campaignsApi,
-    collaborations: collaborationsApi,
+    campaignTalents: campaignTalentsApi,
+    tasks: tasksApi,
+    homeNotes: homeNotesApi,
     appointments: appointmentsApi,
     income: incomeApi,
     costs: costsApi,
+    quotes: quotesApi,
     notifications: notificationsApi,
     search: searchApi,
     analytics: analyticsApi,

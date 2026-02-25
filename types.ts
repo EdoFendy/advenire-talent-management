@@ -7,23 +7,30 @@ export enum AppointmentType {
   OTHER = 'Altro'
 }
 
-export enum CollaborationStatus {
-  DRAFT = 'Bozza',
-  CONFIRMED = 'Confermata',
-  COMPLETED = 'Completata',
-  CANCELLED = 'Annullata'
-}
-
-export enum PaymentStatus {
-  UNPAID = 'Non Saldato',
-  PAID = 'Saldato',
-  PENDING = 'In Attesa'
+export enum CampaignTalentStatus {
+  INVITED = 'invitato',
+  CONFIRMED = 'confermato',
+  DELIVERED = 'consegnato',
+  PAID = 'pagato'
 }
 
 export enum CampaignStatus {
   DRAFT = 'Bozza',
   ACTIVE = 'Attiva',
   CLOSED = 'Chiusa'
+}
+
+export enum TaskStatus {
+  TODO = 'todo',
+  IN_PROGRESS = 'in_progress',
+  DONE = 'done'
+}
+
+export enum TaskPriority {
+  LOW = 'low',
+  NORMAL = 'normal',
+  HIGH = 'high',
+  URGENT = 'urgent'
 }
 
 export interface Attachment {
@@ -39,35 +46,57 @@ export interface Talent {
   firstName: string;
   lastName: string;
   stageName: string;
+  display_name?: string;
   birthDate?: string;
   phone?: string;
   email: string;
+  // Social
   instagram?: string;
   instagramFollowers?: number;
   tiktok?: string;
   tiktokFollowers?: number;
+  youtube_url?: string;
+  twitch_url?: string;
+  other_socials?: string;
+  // Address (legacy single field)
   address?: string;
+  // Address (structured)
+  address_street?: string;
+  address_city?: string;
+  address_zip?: string;
+  address_country?: string;
+  // Shipping
   shippingNotes?: string;
+  // Payment & Billing
   iban?: string;
   vat?: string;
   taxNotes?: string;
+  payout_method?: 'IBAN' | 'PayPal' | 'Entrambi';
+  paypal_email?: string;
+  fiscal_code?: string;
+  bank_name?: string;
+  billing_name?: string;
+  billing_address_street?: string;
+  billing_address_city?: string;
+  billing_address_zip?: string;
+  billing_address_country?: string;
+  // Media
   photoUrl?: string;
-  status: 'active' | 'inactive';
   gallery: string[];
   attachments: any[];
+  // Status & notes
+  status: 'active' | 'inactive';
+  notes?: string;
 }
 
-export interface Brand {
+export interface Client {
   id: string;
-  name: string;
-  contactName?: string;
+  tipo?: string;
+  ragione_sociale: string;
+  referente?: string;
   email?: string;
-  phone?: string;
-  website?: string;
-  vat?: string;
-  address?: string;
-  notes?: string;
-  logoUrl?: string;
+  telefono?: string;
+  note?: string;
 }
 
 export interface Appointment {
@@ -84,18 +113,28 @@ export interface Appointment {
   location?: string;
 }
 
-export interface Collaboration {
+export interface CampaignTalent {
   id: string;
-  talentId: string;
-  brand: string;
-  campaignId: string;
-  type: string;
-  fee: number;
-  status: CollaborationStatus;
-  paymentStatus: PaymentStatus;
-  paidAmount?: number;
-  deadline?: string;
-  notes?: string;
+  campaign_id: string;
+  talent_id: string;
+  compenso_lordo: number;
+  stato: CampaignTalentStatus;
+  note?: string;
+  // Joined talent fields (when querying with JOIN)
+  firstName?: string;
+  lastName?: string;
+  stageName?: string;
+  photoUrl?: string;
+  email?: string;
+  phone?: string;
+  // Joined campaign fields (when querying by talent)
+  campaign_name?: string;
+  campaign_tipo?: string;
+  campaign_status?: string;
+  totalBudget?: number;
+  data_inizio?: string;
+  data_fine?: string;
+  client_id?: string;
 }
 
 export interface ExtraCost {
@@ -122,13 +161,59 @@ export interface Income {
 export interface Campaign {
   id: string;
   name: string;
-  brand: string;
-  period: string;
-  deadline?: string;
+  brand?: string;
+  tipo: string;
+  client_id?: string;
   totalBudget: number;
   agencyFeePercent: number;
   status: CampaignStatus;
   notes?: string;
+  data_inizio?: string;
+  data_fine?: string;
+  period?: string;
+  deadline?: string;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description?: string;
+  due_date?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  related_type?: 'campaign' | 'talent' | 'client';
+  related_id?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface HomeNote {
+  id: string;
+  note_text: string;
+  updated_at: string;
+}
+
+export interface QuoteItem {
+  descrizione: string;
+  quantita: number;
+  prezzo_unitario: number;
+  totale: number;
+}
+
+export interface Quote {
+  id: string;
+  titolo: string;
+  tipo: 'campagna' | 'shooting' | 'evento' | 'consulenza' | 'custom';
+  client_id?: string;
+  campaign_id?: string;
+  stato: 'bozza' | 'inviato' | 'accettato' | 'rifiutato';
+  note?: string;
+  subtotale: number;
+  iva_percent: number;
+  totale: number;
+  items: QuoteItem[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export type Role = 'admin' | 'team' | 'finance' | 'talent';
@@ -151,4 +236,42 @@ export interface Notification {
   read: boolean;
   link?: string;
   createdAt: string;
+}
+
+// ====== Backward-compatible aliases (used by legacy pages until rewrite) ======
+
+export enum CollaborationStatus {
+  CONFIRMED = 'Confermata',
+  COMPLETED = 'Completata',
+  CANCELLED = 'Cancellata',
+  DRAFT = 'Bozza'
+}
+
+export enum PaymentStatus {
+  PAID = 'Saldato',
+  UNPAID = 'Non Saldato',
+  PENDING = 'In attesa'
+}
+
+export interface Collaboration {
+  id: string;
+  talentId: string;
+  brand: string;
+  campaignId: string;
+  type: string;
+  fee: number;
+  status: string;
+  paymentStatus: string;
+  paidAmount: number;
+  notes: string;
+}
+
+export interface Brand {
+  id: string;
+  name: string;
+  contactName: string;
+  email: string;
+  phone: string;
+  notes: string;
+  logoUrl?: string;
 }

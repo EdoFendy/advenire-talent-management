@@ -10,13 +10,14 @@
     "server": "cd server && npm start"
   },
   "dependencies": {
-    "lucide-react": "^0.562.0",
-    "recharts": "^3.6.0",
-    "react-dom": "^19.2.3",
-    "react": "^19.2.3",
-    "react-router-dom": "^7.11.0",
+    "date-fns": "^4.1.0",
     "framer-motion": "^12.23.26",
-    "date-fns": "^4.1.0"
+    "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "react-router-dom": "^7.11.0",
+    "recharts": "^3.6.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
