@@ -1,7 +1,7 @@
 // Global State Context for Advenire Talent Management
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { api } from '../api';
-import { Talent, Campaign, CampaignTalent, Appointment, ExtraCost, Income, AuthState, Role, Client, Task, HomeNote, Quote, AppointmentType } from '../types';
+import { Talent, Campaign, CampaignTalent, Appointment, ExtraCost, Income, AuthState, Role, Client, Task, HomeNote, Quote, AppointmentType, CompanySettings, Notification } from '../types';
 
 // Initial data for offline/fallback mode
 import {
@@ -11,16 +11,6 @@ import {
     INITIAL_EXTRA_COSTS,
     INITIAL_INCOME
 } from '../store';
-
-interface Notification {
-    id: string;
-    type: string;
-    title: string;
-    message?: string;
-    read: boolean;
-    link?: string;
-    createdAt: string;
-}
 
 interface SearchResult {
     type: 'talent' | 'campaign' | 'client';
@@ -98,12 +88,14 @@ interface AppState {
     addCampaign: (data: any) => Promise<Campaign>;
     updateCampaign: (id: string, updates: Partial<Campaign>) => Promise<Campaign>;
     deleteCampaign: (id: string) => Promise<void>;
+    activateCampaign: (id: string) => Promise<void>;
 
     // Actions - Campaign Talents
     fetchCampaignTalents: () => Promise<void>;
     addCampaignTalent: (ct: Omit<CampaignTalent, 'id'>) => Promise<CampaignTalent>;
     updateCampaignTalent: (id: string, updates: Partial<CampaignTalent>) => Promise<CampaignTalent>;
     deleteCampaignTalent: (id: string) => Promise<void>;
+    respondToCampaignAssignment: (campaignTalentId: string, action: 'accept' | 'decline') => Promise<void>;
 
     // Actions - Tasks
     fetchTasks: () => Promise<void>;
@@ -145,6 +137,11 @@ interface AppState {
     // Actions - Search
     globalSearch: (query: string) => Promise<SearchResult[]>;
     clearSearchResults: () => void;
+
+    // Actions - Company Settings
+    companySettings: CompanySettings | null;
+    fetchCompanySettings: () => Promise<void>;
+    updateCompanySettings: (updates: Partial<CompanySettings>) => Promise<CompanySettings>;
 
     // Actions - Analytics
     fetchAnalytics: () => Promise<void>;
@@ -190,6 +187,7 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     const [income, setIncome] = useState<Income[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [analytics, setAnalytics] = useState<Analytics | null>(null);
+    const [companySettings, setCompanySettings] = useState<CompanySettings | null>(null);
 
     // Auth State
     const [auth, setAuth] = useState<AuthState>(() => {
@@ -258,10 +256,21 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
                         setExtraCosts(costsData);
                         setQuotes(quotesData);
 
-                        // Load home note
+                        // Load home note and company settings
                         try {
                             const noteData = await api.homeNotes.get();
                             setHomeNote(noteData);
+                        } catch { /* ignore */ }
+                        try {
+                            const csData = await api.companySettings.get();
+                            setCompanySettings(csData);
+                        } catch { /* ignore */ }
+
+                        // Load notifications
+                        try {
+                            const userId = auth.user?.id;
+                            const notifsData = await api.notifications.getAll(userId);
+                            setNotifications(notifsData);
                         } catch { /* ignore */ }
                     } catch (error) {
                         console.error('Failed to load from API, using fallback:', error);
@@ -298,6 +307,18 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
     useEffect(() => {
         localStorage.setItem('advenire_auth', JSON.stringify(auth));
     }, [auth]);
+
+    // Poll notifications every 30 seconds
+    useEffect(() => {
+        if (!auth.user || !isOnline) return;
+        const interval = setInterval(async () => {
+            try {
+                const data = await api.notifications.getAll(auth.user?.id);
+                setNotifications(data);
+            } catch { /* ignore */ }
+        }, 30000);
+        return () => clearInterval(interval);
+    }, [auth.user, isOnline]);
 
     // Persist to localStorage when offline
     useEffect(() => {
@@ -459,6 +480,16 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         showToast('Campagna eliminata', 'success');
     }, [isOnline, showToast]);
 
+    const activateCampaign = useCallback(async (id: string) => {
+        if (!isOnline) {
+            showToast('Non disponibile offline', 'error');
+            return;
+        }
+        await api.campaigns.activate(id);
+        await Promise.all([fetchCampaigns(), fetchCampaignTalents(), fetchNotifications()]);
+        showToast('Campagna attivata! Notifiche inviate ai talent', 'success');
+    }, [isOnline, showToast]);
+
     // ============== CAMPAIGN TALENTS ACTIONS ==============
     const fetchCampaignTalents = useCallback(async () => {
         if (isOnline) {
@@ -500,6 +531,20 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         }
         setCampaignTalents(prev => prev.filter(ct => ct.id !== id));
         showToast('Talent rimosso dalla campagna', 'success');
+    }, [isOnline, showToast]);
+
+    const respondToCampaignAssignment = useCallback(async (campaignTalentId: string, action: 'accept' | 'decline') => {
+        if (!isOnline) {
+            showToast('Non disponibile offline', 'error');
+            return;
+        }
+        await api.campaignTalents.respond(campaignTalentId, action);
+        await Promise.all([fetchCampaignTalents(), fetchNotifications()]);
+        if (action === 'accept') {
+            showToast('Campagna accettata!', 'success');
+        } else {
+            showToast('Campagna rifiutata', 'info');
+        }
     }, [isOnline, showToast]);
 
     // ============== TASKS ACTIONS ==============
@@ -751,6 +796,26 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     }, [isOnline, auth.user?.id]);
 
+    // ============== COMPANY SETTINGS ACTIONS ==============
+    const fetchCompanySettings = useCallback(async () => {
+        if (isOnline) {
+            const data = await api.companySettings.get();
+            setCompanySettings(data);
+        }
+    }, [isOnline]);
+
+    const updateCompanySettings = useCallback(async (updates: Partial<CompanySettings>) => {
+        if (isOnline) {
+            const updated = await api.companySettings.update(updates);
+            setCompanySettings(updated);
+            showToast('Dati azienda aggiornati', 'success');
+            return updated;
+        } else {
+            showToast('Non disponibile offline', 'error');
+            throw new Error('Offline');
+        }
+    }, [isOnline, showToast]);
+
     // ============== SEARCH ACTIONS ==============
     const globalSearch = useCallback(async (query: string) => {
         if (query.length < 2) {
@@ -926,11 +991,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
         addCampaign,
         updateCampaign,
         deleteCampaign,
+        activateCampaign,
 
         fetchCampaignTalents,
         addCampaignTalent,
         updateCampaignTalent,
         deleteCampaignTalent,
+        respondToCampaignAssignment,
 
         fetchTasks,
         addTask,
@@ -965,6 +1032,10 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
 
         globalSearch,
         clearSearchResults,
+
+        companySettings,
+        fetchCompanySettings,
+        updateCompanySettings,
 
         fetchAnalytics,
 

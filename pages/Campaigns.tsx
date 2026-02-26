@@ -4,7 +4,7 @@ import {
   Briefcase, Plus, Search, Calendar,
   Users, X, Trash2, ChevronRight, ChevronLeft,
   CheckCircle2, Music, Megaphone, Building2, UserPlus,
-  Eye, Edit3, Lock, ListTodo, ArrowRight
+  Eye, Edit3, Lock, ListTodo, ArrowRight, Zap, AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { format } from 'date-fns';
@@ -556,7 +556,7 @@ interface CampaignDetailProps {
 const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) => {
   const {
     campaigns, clients, talents, campaignTalents, tasks, income,
-    updateCampaign, addCampaignTalent, updateCampaignTalent, deleteCampaignTalent,
+    updateCampaign, activateCampaign, addCampaignTalent, updateCampaignTalent, deleteCampaignTalent,
     addTask, updateTask, deleteTask,
     addIncome, updateIncome, deleteIncome,
     showToast
@@ -603,8 +603,12 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
   };
 
   const handleToggleStatus = async () => {
-    const newStatus = campaign.status === CampaignStatus.ACTIVE ? CampaignStatus.CLOSED : CampaignStatus.ACTIVE;
-    await updateCampaign(campaign.id, { status: newStatus });
+    if (campaign.status === CampaignStatus.DRAFT) {
+      await activateCampaign(campaign.id);
+    } else {
+      const newStatus = campaign.status === CampaignStatus.ACTIVE ? CampaignStatus.CLOSED : CampaignStatus.ACTIVE;
+      await updateCampaign(campaign.id, { status: newStatus });
+    }
   };
 
   const handleAddTalentSubmit = async () => {
@@ -702,9 +706,15 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
               <button onClick={handleStartEdit} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all" title="Modifica">
                 <Edit3 size={16} />
               </button>
-              <button onClick={handleToggleStatus} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all" title={isClosed ? 'Riapri' : 'Chiudi'}>
-                {isClosed ? <CheckCircle2 size={16} /> : <Lock size={16} />}
-              </button>
+              {campaign.status === CampaignStatus.DRAFT ? (
+                <button onClick={handleToggleStatus} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20">
+                  <Zap size={14} /> Attiva Campagna
+                </button>
+              ) : (
+                <button onClick={handleToggleStatus} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all" title={isClosed ? 'Riapri' : 'Chiudi'}>
+                  {isClosed ? <CheckCircle2 size={16} /> : <Lock size={16} />}
+                </button>
+              )}
               <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all">
                 <X size={18} />
               </button>
@@ -915,24 +925,29 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
-                      {statusOptions.map(status => (
-                        <button
-                          key={status}
-                          onClick={() => !isClosed && updateCampaignTalent(ct.id, { stato: status })}
-                          disabled={isClosed}
-                          className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${ct.stato === status
-                            ? status === CampaignTalentStatus.PAID ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                              : status === CampaignTalentStatus.DELIVERED ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                                : status === CampaignTalentStatus.CONFIRMED ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                      {statusOptions.filter(s => s !== CampaignTalentStatus.DECLINED).map(status => {
+                        const statusStyle = ct.stato === status
+                          ? status === CampaignTalentStatus.PAID ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : status === CampaignTalentStatus.DELIVERED ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                              : status === CampaignTalentStatus.CONFIRMED ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                : status === CampaignTalentStatus.PENDING ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
                                   : 'bg-zinc-700/50 text-zinc-300 border border-zinc-600/30'
-                            : 'bg-zinc-900/50 text-zinc-600 border border-white/5 hover:text-zinc-400'
-                            } ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        >
-                          {status === CampaignTalentStatus.INVITED ? 'Invitato' :
-                            status === CampaignTalentStatus.CONFIRMED ? 'Confermato' :
-                              status === CampaignTalentStatus.DELIVERED ? 'Consegnato' : 'Pagato'}
-                        </button>
-                      ))}
+                          : 'bg-zinc-900/50 text-zinc-600 border border-white/5 hover:text-zinc-400';
+                        const statusLabel = status === CampaignTalentStatus.INVITED ? 'Invitato'
+                          : status === CampaignTalentStatus.PENDING ? 'In Attesa'
+                            : status === CampaignTalentStatus.CONFIRMED ? 'Confermato'
+                              : status === CampaignTalentStatus.DELIVERED ? 'Consegnato' : 'Pagato';
+                        return (
+                          <button
+                            key={status}
+                            onClick={() => !isClosed && updateCampaignTalent(ct.id, { stato: status })}
+                            disabled={isClosed}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${statusStyle} ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            {statusLabel}
+                          </button>
+                        );
+                      })}
 
                       {!isClosed && (
                         <button
@@ -1129,7 +1144,7 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
 const Campaigns: React.FC = () => {
   const {
     campaigns, clients, talents, campaignTalents, deleteCampaign,
-    updateCampaign, showToast
+    updateCampaign, activateCampaign, showToast
   } = useApp();
 
   const [showWizard, setShowWizard] = useState(false);
@@ -1253,7 +1268,14 @@ const Campaigns: React.FC = () => {
                       </span>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors">{campaign.name}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors">{campaign.name}</p>
+                        {(campaign.deadline || campaign.data_fine) && new Date(campaign.deadline || campaign.data_fine!) <= new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) && campaign.status !== CampaignStatus.CLOSED && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[8px] font-black uppercase tracking-widest border border-red-500/30 animate-pulse">
+                            <AlertTriangle size={10} /> URGENTE
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-4">
                       <p className="text-xs font-bold text-zinc-400">{clientName}</p>

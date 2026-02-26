@@ -293,25 +293,25 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
         <div className="flex items-center gap-2 flex-wrap">
           {isEditing ? (
             <>
-              <button onClick={() => setIsEditing(false)} className="flex items-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
+              <button onClick={() => setIsEditing(false)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
                 <X size={14} /> Annulla
               </button>
-              <button onClick={handleSaveEdit} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest text-white transition-all">
+              <button onClick={handleSaveEdit} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest text-white transition-all">
                 <Save size={14} /> Salva
               </button>
             </>
           ) : (
             <>
-              <button onClick={handleStartEdit} className="flex items-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
+              <button onClick={handleStartEdit} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
                 <Edit3 size={14} /> Modifica
               </button>
-              <button onClick={() => setShowAssignModal(true)} className="flex items-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
+              <button onClick={() => setShowAssignModal(true)} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
                 <Briefcase size={14} /> Assegna a Campagna
               </button>
-              <button onClick={handleCopySocial} className="flex items-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
+              <button onClick={handleCopySocial} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
                 <Copy size={14} /> Social
               </button>
-              <button onClick={handleCopyBilling} className="flex items-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
+              <button onClick={handleCopyBilling} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-zinc-900 px-4 py-2.5 rounded-xl border border-white/5 font-black uppercase text-[10px] tracking-widest text-zinc-400 hover:text-white transition-all">
                 <Copy size={14} /> Fatturazione
               </button>
             </>
@@ -780,7 +780,7 @@ const TalentProfile: React.FC<TalentProfileProps> = ({ talents, appointments, ca
           {activeTab === 'finanze' && (
             <div className="space-y-6">
               {/* Summary */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-5">
                   <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Totale Compensi</p>
                   <p className="text-2xl font-black text-white">€{totalEarnings.toLocaleString()}</p>

@@ -308,7 +308,7 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = () => {
-  const { tasks, addTask, updateTask, deleteTask, homeNote, updateHomeNote, campaigns, appointments } = useApp();
+  const { tasks, addTask, updateTask, deleteTask, homeNote, updateHomeNote, campaigns, appointments, campaignTalents, talents } = useApp();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
@@ -366,6 +366,52 @@ const Dashboard: React.FC<DashboardProps> = () => {
     activeTasks.filter(t => t.due_date && t.due_date >= today && t.due_date <= nextWeekEnd),
     [activeTasks, today, nextWeekEnd]
   );
+
+  // Campaign events for day columns
+  const getCampaignEventsForDay = useCallback((dayStr: string) => {
+    const events: { id: string; label: string; campaignName: string; talentName: string; type: 'start' | 'end' | 'deadline'; isUrgent: boolean }[] = [];
+    campaigns.forEach(c => {
+      if (c.status !== 'Attiva' && c.status !== 'Chiusa') return;
+      if (c.data_inizio && c.data_inizio.startsWith(dayStr)) {
+        events.push({ id: `cs-${c.id}`, label: 'Inizio', campaignName: c.name, talentName: '', type: 'start', isUrgent: false });
+      }
+      if (c.data_fine && c.data_fine.startsWith(dayStr)) {
+        events.push({ id: `ce-${c.id}`, label: 'Fine', campaignName: c.name, talentName: '', type: 'end', isUrgent: false });
+      }
+      if (c.deadline && c.deadline.startsWith(dayStr)) {
+        events.push({ id: `cd-${c.id}`, label: 'Deadline', campaignName: c.name, talentName: '', type: 'deadline', isUrgent: true });
+      }
+    });
+    // Also show campaign-talent deadlines
+    campaignTalents.forEach(ct => {
+      if (ct.deadline && ct.deadline.startsWith(dayStr)) {
+        const campaign = campaigns.find(c => c.id === ct.campaign_id);
+        const talent = talents.find(t => t.id === ct.talent_id);
+        if (campaign) {
+          events.push({
+            id: `ctd-${ct.id}`,
+            label: `Deadline ${talent ? talent.firstName : 'Talent'}`,
+            campaignName: campaign.name,
+            talentName: talent ? `${talent.firstName} ${talent.lastName}` : '',
+            type: 'deadline',
+            isUrgent: true
+          });
+        }
+      }
+    });
+    return events;
+  }, [campaigns, campaignTalents, talents]);
+
+  // Urgent campaigns: deadline tomorrow or past-due
+  const urgentCampaigns = useMemo(() => {
+    const tomorrowDate = addDays(new Date(), 1);
+    return campaigns.filter(c => {
+      if (c.status !== 'Attiva') return false;
+      if (!c.deadline) return false;
+      const dl = parseISO(c.deadline);
+      return isBefore(dl, addDays(new Date(), 2));
+    });
+  }, [campaigns]);
 
   // Calendar events: combine tasks, campaigns, and appointments
   const calendarEvents = useMemo(() => {
@@ -443,10 +489,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
           title: `${a.type}: ${a.brand || a.talentName}`,
           type: 'appointment',
           date: a.date,
-          color: a.type === AppointmentType.SHOOTING ? 'bg-cyan-400' :
-                 a.type === AppointmentType.PUBLICATION ? 'bg-pink-400' :
-                 a.type === AppointmentType.CALL ? 'bg-amber-400' :
-                 a.type === AppointmentType.DELIVERY ? 'bg-emerald-400' : 'bg-zinc-400',
+          color: 'bg-amber-400',
           appointmentType: a.type,
           status: a.status,
           description: a.description || `${a.type}${a.location ? ` @ ${a.location}` : ''}`,
@@ -563,6 +606,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
               onClickTask={(t) => setSelectedTask(t)}
               accentColor="text-blue-500"
             />
+            {getCampaignEventsForDay(today).length > 0 && (
+              <div className="bg-[#0c0c0c] border border-purple-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Briefcase size={14} className="text-purple-400" />
+                  <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Campagne Oggi</span>
+                  <span className="ml-auto text-[10px] font-bold text-zinc-600 bg-purple-500/10 px-2 py-0.5 rounded-lg">{getCampaignEventsForDay(today).length}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {getCampaignEventsForDay(today).map(evt => (
+                    <div key={evt.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-purple-500/10 bg-purple-500/[0.03] hover:bg-purple-500/[0.06] transition-all">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${evt.type === 'deadline' ? 'bg-red-400' : 'bg-purple-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{evt.campaignName}</p>
+                        <p className="text-[10px] text-purple-400/70 truncate">{evt.label}{evt.talentName ? ` — ${evt.talentName}` : ''}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* DOMANI */}
             <TaskSection
@@ -575,6 +638,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
               onClickTask={(t) => setSelectedTask(t)}
               accentColor="text-emerald-500"
             />
+            {getCampaignEventsForDay(tomorrow).length > 0 && (
+              <div className="bg-[#0c0c0c] border border-purple-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Briefcase size={14} className="text-purple-400" />
+                  <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Campagne Domani</span>
+                  <span className="ml-auto text-[10px] font-bold text-zinc-600 bg-purple-500/10 px-2 py-0.5 rounded-lg">{getCampaignEventsForDay(tomorrow).length}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {getCampaignEventsForDay(tomorrow).map(evt => (
+                    <div key={evt.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-purple-500/10 bg-purple-500/[0.03] hover:bg-purple-500/[0.06] transition-all">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${evt.type === 'deadline' ? 'bg-red-400' : 'bg-purple-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{evt.campaignName}</p>
+                        <p className="text-[10px] text-purple-400/70 truncate">{evt.label}{evt.talentName ? ` — ${evt.talentName}` : ''}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* DOPODOMANI */}
             <TaskSection
@@ -587,6 +670,26 @@ const Dashboard: React.FC<DashboardProps> = () => {
               onClickTask={(t) => setSelectedTask(t)}
               accentColor="text-purple-500"
             />
+            {getCampaignEventsForDay(dayAfterTomorrow).length > 0 && (
+              <div className="bg-[#0c0c0c] border border-purple-500/10 rounded-2xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Briefcase size={14} className="text-purple-400" />
+                  <span className="text-[10px] font-black text-purple-400 uppercase tracking-widest">Campagne Dopodomani</span>
+                  <span className="ml-auto text-[10px] font-bold text-zinc-600 bg-purple-500/10 px-2 py-0.5 rounded-lg">{getCampaignEventsForDay(dayAfterTomorrow).length}</span>
+                </div>
+                <div className="space-y-1.5">
+                  {getCampaignEventsForDay(dayAfterTomorrow).map(evt => (
+                    <div key={evt.id} className="flex items-center gap-3 p-2.5 rounded-xl border border-purple-500/10 bg-purple-500/[0.03] hover:bg-purple-500/[0.06] transition-all">
+                      <div className={`w-2 h-2 rounded-full flex-shrink-0 ${evt.type === 'deadline' ? 'bg-red-400' : 'bg-purple-400'}`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-white truncate">{evt.campaignName}</p>
+                        <p className="text-[10px] text-purple-400/70 truncate">{evt.label}{evt.talentName ? ` — ${evt.talentName}` : ''}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* URGENZE & PROSSIMA SETTIMANA */}
             <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-4">
@@ -603,7 +706,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                     urgentSubTab === 'urgent' ? 'bg-red-500/20 text-red-400' : 'text-zinc-600 hover:text-zinc-400'
                   }`}
                 >
-                  Urgenti / Scadute ({urgentTasks.length})
+                  Urgenti / Scadute ({urgentTasks.length + urgentCampaigns.length})
                 </button>
                 <button
                   onClick={() => setUrgentSubTab('week')}
@@ -617,12 +720,28 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
               <div className="space-y-1.5 max-h-[220px] overflow-y-auto custom-scrollbar">
                 {urgentSubTab === 'urgent' ? (
-                  urgentTasks.length === 0 ? (
+                  urgentTasks.length === 0 && urgentCampaigns.length === 0 ? (
                     <p className="text-[10px] text-zinc-700 py-4 text-center italic">Nessuna urgenza</p>
                   ) : (
-                    urgentTasks.map(task => (
-                      <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
-                    ))
+                    <>
+                      {urgentTasks.map(task => (
+                        <TaskItem key={task.id} task={task} onToggle={() => handleToggleTask(task)} onClick={() => setSelectedTask(task)} />
+                      ))}
+                      {urgentCampaigns.map(c => (
+                        <div key={`uc-${c.id}`} className="flex items-center gap-3 p-3 rounded-xl border border-red-500/20 bg-red-500/[0.03] transition-all">
+                          <div className="w-5 h-5 rounded-lg bg-purple-500/20 flex items-center justify-center flex-shrink-0">
+                            <Briefcase size={12} className="text-purple-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-white truncate">{c.name}</p>
+                            <p className="text-[10px] text-red-400/70 truncate">
+                              Deadline: {c.deadline ? format(parseISO(c.deadline), 'd MMM', { locale: it }) : 'N/D'}
+                            </p>
+                          </div>
+                          <span className="text-[8px] font-black text-red-400 bg-red-500/10 px-1.5 py-0.5 rounded uppercase tracking-wider">Campagna</span>
+                        </div>
+                      ))}
+                    </>
                   )
                 ) : (
                   nextWeekTasks.length === 0 ? (
@@ -678,7 +797,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
 
         {/* RIGHT: Calendar (expandable) */}
         <div className={`space-y-4 ${calendarExpanded ? 'col-span-full' : ''}`}>
-          <div className={`bg-[#0c0c0c] border border-white/5 rounded-2xl p-4 ${calendarExpanded ? '' : 'sticky top-28'}`}>
+          <div className={`bg-[#0c0c0c] border border-white/5 rounded-2xl p-4 ${calendarExpanded ? '' : 'md:sticky md:top-28'}`}>
             {/* Calendar header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -794,7 +913,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                             key={i}
                             className={`px-1.5 py-1 rounded text-[8px] font-bold truncate border-l-2 ${
                               evt.type === 'campaign' ? 'bg-purple-500/10 border-purple-500 text-purple-400' :
-                              evt.type === 'appointment' ? 'bg-cyan-500/10 border-cyan-500 text-cyan-400' :
+                              evt.type === 'appointment' ? 'bg-amber-500/10 border-amber-500 text-amber-400' :
                               evt.priority === 'urgent' ? 'bg-red-500/10 border-red-500 text-red-400' :
                               'bg-blue-500/10 border-blue-500 text-blue-400'
                             }`}
@@ -836,7 +955,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                 <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Campagne</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-cyan-400" />
+                <div className="w-2 h-2 rounded-full bg-amber-400" />
                 <span className="text-[9px] font-bold text-zinc-600 uppercase tracking-wider">Appuntamenti</span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -860,7 +979,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       onClick={() => evt.type === 'task' ? setSelectedTask(tasks.find(t => `task-${t.id}` === evt.id) || null) : undefined}
                       className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all cursor-pointer hover:bg-white/[0.02] ${
                         evt.type === 'campaign' ? 'border-purple-500/20 bg-purple-500/[0.03]' :
-                        evt.type === 'appointment' ? 'border-cyan-500/20 bg-cyan-500/[0.03]' :
+                        evt.type === 'appointment' ? 'border-amber-500/20 bg-amber-500/[0.03]' :
                         'border-white/5'
                       }`}
                     >
@@ -871,7 +990,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       </div>
                       <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
                         evt.type === 'campaign' ? 'bg-purple-500/10 text-purple-400' :
-                        evt.type === 'appointment' ? 'bg-cyan-500/10 text-cyan-400' :
+                        evt.type === 'appointment' ? 'bg-amber-500/10 text-amber-400' :
                         'bg-blue-500/10 text-blue-400'
                       }`}>
                         {evt.type === 'campaign' ? 'Campagna' : evt.type === 'appointment' ? 'Appunt.' : 'Task'}
@@ -936,7 +1055,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                       key={evt.id}
                       className={`p-4 rounded-2xl border ${
                         evt.type === 'campaign' ? 'bg-purple-500/5 border-purple-500/20' :
-                        evt.type === 'appointment' ? 'bg-cyan-500/5 border-cyan-500/20' :
+                        evt.type === 'appointment' ? 'bg-amber-500/5 border-amber-500/20' :
                         evt.priority === 'urgent' ? 'bg-red-500/5 border-red-500/20' :
                         'bg-zinc-900/50 border-white/5'
                       }`}
@@ -946,7 +1065,7 @@ const Dashboard: React.FC<DashboardProps> = () => {
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-lg tracking-wider ${
                               evt.type === 'campaign' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' :
-                              evt.type === 'appointment' ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20' :
+                              evt.type === 'appointment' ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
                               'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                             }`}>
                               {evt.type === 'campaign' ? (evt.isStart ? 'Inizio Campagna' : evt.isEnd ? 'Fine Campagna' : 'Deadline') :

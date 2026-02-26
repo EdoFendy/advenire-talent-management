@@ -154,6 +154,28 @@ export function initializeDatabase() {
     )
   `);
 
+  // Migration: Add new columns to campaign_talents
+  const campaignTalentMigrations = [
+    'ALTER TABLE campaign_talents ADD COLUMN deadline TEXT',
+    'ALTER TABLE campaign_talents ADD COLUMN responded_at TEXT',
+  ];
+  for (const sql of campaignTalentMigrations) {
+    try { db.prepare(sql).run(); } catch (e) { /* column exists */ }
+  }
+
+  // Migration: Add new columns to notifications
+  const notificationMigrations = [
+    'ALTER TABLE notifications ADD COLUMN action_required INTEGER DEFAULT 0',
+    'ALTER TABLE notifications ADD COLUMN action_type TEXT',
+    'ALTER TABLE notifications ADD COLUMN action_data TEXT',
+  ];
+  for (const sql of notificationMigrations) {
+    try { db.prepare(sql).run(); } catch (e) { /* column exists */ }
+  }
+
+  // Migration: Add assigned_talent_id to tasks
+  try { db.prepare('ALTER TABLE tasks ADD COLUMN assigned_talent_id TEXT').run(); } catch (e) { /* column exists */ }
+
   // Seed default home note if none exists
   const homeNote = db.prepare('SELECT * FROM home_notes LIMIT 1').get();
   if (!homeNote) {
@@ -247,6 +269,34 @@ export function initializeDatabase() {
       FOREIGN KEY (campaign_id) REFERENCES campaigns(id) ON DELETE SET NULL
     )
   `);
+
+  // Company Settings Table
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS company_settings (
+      id TEXT PRIMARY KEY DEFAULT 'company-1',
+      ragione_sociale TEXT,
+      piva TEXT,
+      codice_fiscale TEXT,
+      indirizzo_via TEXT,
+      indirizzo_citta TEXT,
+      indirizzo_cap TEXT,
+      indirizzo_paese TEXT,
+      email TEXT,
+      telefono TEXT,
+      pec TEXT,
+      sdi TEXT,
+      website TEXT,
+      logo_url TEXT,
+      note TEXT,
+      updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  // Seed default company settings if none exists
+  const companySetting = db.prepare('SELECT * FROM company_settings LIMIT 1').get();
+  if (!companySetting) {
+    db.prepare('INSERT INTO company_settings (id, ragione_sociale) VALUES (?, ?)').run('company-1', 'Advenire');
+  }
 
   // Users Table (for authentication)
   db.exec(`
@@ -683,8 +733,8 @@ export const campaignTalentsDB = {
 
   create: (ct: any) => {
     const stmt = db.prepare(`
-      INSERT INTO campaign_talents (id, campaign_id, talent_id, compenso_lordo, stato, note)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO campaign_talents (id, campaign_id, talent_id, compenso_lordo, stato, note, deadline, responded_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `);
     stmt.run(
       ct.id,
@@ -692,7 +742,9 @@ export const campaignTalentsDB = {
       ct.talent_id,
       ct.compenso_lordo || 0,
       ct.stato || 'invitato',
-      ct.note || null
+      ct.note || null,
+      ct.deadline || null,
+      ct.responded_at || null
     );
     return ct;
   },
@@ -979,18 +1031,27 @@ export const notificationsDB = {
 
   create: (notif: any) => {
     const stmt = db.prepare(`
-      INSERT INTO notifications (id, userId, type, title, message, link)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO notifications (id, userId, type, title, message, link, action_required, action_type, action_data)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
+    const id = notif.id || `notif-${Date.now()}`;
     stmt.run(
-      notif.id || `notif-${Date.now()}`,
+      id,
       notif.userId || null,
       notif.type,
       notif.title,
       notif.message || null,
-      notif.link || null
+      notif.link || null,
+      notif.action_required ? 1 : 0,
+      notif.action_type || null,
+      notif.action_data || null
     );
-    return notif;
+    return { ...notif, id };
+  },
+
+  getActionRequired: (userId: string) => {
+    const stmt = db.prepare('SELECT * FROM notifications WHERE userId = ? AND action_required = 1 AND read = 0 ORDER BY createdAt DESC');
+    return stmt.all(userId);
   },
 
   markAsRead: (id: string) => {
@@ -1105,6 +1166,25 @@ export const quotesDB = {
   delete: (id: string) => {
     db.prepare('DELETE FROM quotes WHERE id = ?').run(id);
     return { success: true };
+  }
+};
+
+// ============== COMPANY SETTINGS ==============
+export const companySettingsDB = {
+  get: () => {
+    const stmt = db.prepare('SELECT * FROM company_settings WHERE id = ?');
+    return stmt.get('company-1') || { id: 'company-1', ragione_sociale: 'Advenire' };
+  },
+
+  update: (updates: any) => {
+    const fields = Object.keys(updates).filter(k => k !== 'id');
+    if (fields.length === 0) return companySettingsDB.get();
+
+    const setClause = fields.map(f => `${f} = ?`).join(', ');
+    const values = fields.map(f => updates[f]);
+
+    db.prepare(`UPDATE company_settings SET ${setClause}, updated_at = CURRENT_TIMESTAMP WHERE id = 'company-1'`).run(...values);
+    return companySettingsDB.get();
   }
 };
 

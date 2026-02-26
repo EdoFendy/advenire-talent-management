@@ -9,7 +9,9 @@ export enum AppointmentType {
 
 export enum CampaignTalentStatus {
   INVITED = 'invitato',
+  PENDING = 'in_attesa',
   CONFIRMED = 'confermato',
+  DECLINED = 'rifiutato',
   DELIVERED = 'consegnato',
   PAID = 'pagato'
 }
@@ -120,6 +122,8 @@ export interface CampaignTalent {
   compenso_lordo: number;
   stato: CampaignTalentStatus;
   note?: string;
+  deadline?: string;
+  responded_at?: string;
   // Joined talent fields (when querying with JOIN)
   firstName?: string;
   lastName?: string;
@@ -183,6 +187,7 @@ export interface Task {
   priority: TaskPriority;
   related_type?: 'campaign' | 'talent' | 'client';
   related_id?: string;
+  assigned_talent_id?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -195,9 +200,8 @@ export interface HomeNote {
 
 export interface QuoteItem {
   descrizione: string;
+  link_social: string;
   quantita: number;
-  prezzo_unitario: number;
-  totale: number;
 }
 
 export interface Quote {
@@ -236,6 +240,9 @@ export interface Notification {
   read: boolean;
   link?: string;
   createdAt: string;
+  action_required?: boolean;
+  action_type?: string;
+  action_data?: string;
 }
 
 // ====== Backward-compatible aliases (used by legacy pages until rewrite) ======
@@ -274,4 +281,23 @@ export interface Brand {
   phone: string;
   notes: string;
   logoUrl?: string;
+}
+
+export interface CompanySettings {
+  id: string;
+  ragione_sociale: string;
+  piva?: string;
+  codice_fiscale?: string;
+  indirizzo_via?: string;
+  indirizzo_citta?: string;
+  indirizzo_cap?: string;
+  indirizzo_paese?: string;
+  email?: string;
+  telefono?: string;
+  pec?: string;
+  sdi?: string;
+  website?: string;
+  logo_url?: string;
+  note?: string;
+  updated_at?: string;
 }

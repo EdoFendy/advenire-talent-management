@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, X, FileText, Loader2, UserPlus, Check, Download, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, XCircle, Upload } from 'lucide-react';
+import { Search, X, FileText, Loader2, UserPlus, Check, Download, ChevronRight, ChevronLeft, AlertTriangle, CheckCircle, XCircle, Upload, Copy } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { talentsApi } from '../api';
@@ -710,7 +710,7 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
 
 // ============== MAIN ROSTER COMPONENT ==============
 const Roster: React.FC = () => {
-  const { talents, addTalent, fetchTalents } = useApp();
+  const { talents, addTalent, fetchTalents, showToast } = useApp();
   const [search, setSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
@@ -787,7 +787,7 @@ const Roster: React.FC = () => {
       </div>
 
       {/* Search + Filter Bar */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div className="flex-1 flex items-center bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-2.5 focus-within:border-blue-500/50 transition-all">
           <Search size={16} className="text-zinc-600 mr-3" />
           <input
@@ -827,8 +827,29 @@ const Roster: React.FC = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.02 }}
             onClick={() => navigate(`/roster/${talent.id}`)}
-            className="bg-[#0c0c0c] border border-white/5 rounded-2xl p-3 cursor-pointer hover:border-blue-500/40 hover:shadow-lg hover:shadow-blue-500/5 transition-all group"
+            className="relative bg-[#0c0c0c] border border-white/5 rounded-2xl p-3 cursor-pointer hover:border-blue-500/40 hover:shadow-lg hover:shadow-blue-500/5 transition-all group"
           >
+            {/* Copy shipping address button */}
+            {(talent.address_street || talent.address_city) && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const parts = [
+                    `${talent.firstName} ${talent.lastName}`,
+                    talent.address_street,
+                    [talent.address_zip, talent.address_city].filter(Boolean).join(' '),
+                    talent.address_country,
+                    talent.shippingNotes ? `Note: ${talent.shippingNotes}` : ''
+                  ].filter(Boolean);
+                  navigator.clipboard.writeText(parts.join('\n'));
+                  showToast('Indirizzo copiato negli appunti', 'success');
+                }}
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 bg-zinc-800/90 backdrop-blur rounded-lg text-zinc-400 hover:text-white transition-all z-10"
+                title="Copia indirizzo spedizione"
+              >
+                <Copy size={12} />
+              </button>
+            )}
             <div className="flex items-center gap-3">
               <div className="w-14 h-14 rounded-full bg-zinc-800 overflow-hidden flex-shrink-0 border-2 border-white/5 group-hover:border-blue-500/30 transition-all">
                 {talent.photoUrl ? (

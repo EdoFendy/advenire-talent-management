@@ -20,7 +20,8 @@ import {
     notificationsDB,
     quotesDB,
     searchDB,
-    usersDB
+    usersDB,
+    companySettingsDB
 } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -664,6 +665,61 @@ app.delete('/api/campaigns/:id', (req: Request, res: Response) => {
     }
 });
 
+// ============== CAMPAIGN ACTIVATION ==============
+app.put('/api/campaigns/:id/activate', (req: Request, res: Response) => {
+    try {
+        const campaign = campaignsDB.getById(req.params.id) as any;
+        if (!campaign) {
+            return res.status(404).json({ error: 'Campagna non trovata' });
+        }
+
+        // Update campaign status to Attiva
+        campaignsDB.update(req.params.id, { status: 'Attiva' });
+
+        // Get all talent assignments for this campaign
+        const talents = campaignTalentsDB.getByCampaign(req.params.id) as any[];
+
+        for (const ct of talents) {
+            // Set status to in_attesa and copy campaign deadline
+            campaignTalentsDB.update(ct.id, {
+                stato: 'in_attesa',
+                deadline: campaign.deadline || campaign.data_fine || null
+            });
+
+            // Find the user account for this talent
+            const user = usersDB.getByTalentId(ct.talent_id) as any;
+            const userId = user ? user.id : ct.talent_id;
+
+            // Create action-required notification for the talent
+            notificationsDB.create({
+                id: `notif-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+                userId: userId,
+                type: 'campaign_invitation',
+                title: 'Nuova Campagna Assegnata',
+                message: `Sei stato invitato alla campagna "${campaign.name}". Accetta o rifiuta.`,
+                link: '/my-dashboard',
+                action_required: true,
+                action_type: 'campaign_accept_decline',
+                action_data: JSON.stringify({
+                    campaignTalentId: ct.id,
+                    campaignId: campaign.id,
+                    campaignName: campaign.name,
+                    brand: campaign.brand || '',
+                    compenso: ct.compenso_lordo || 0,
+                    deadline: campaign.deadline || campaign.data_fine || null,
+                    data_inizio: campaign.data_inizio || null,
+                    data_fine: campaign.data_fine || null
+                })
+            });
+        }
+
+        const updatedCampaign = campaignsDB.getById(req.params.id);
+        res.json(updatedCampaign);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ============== CAMPAIGN TALENTS API ==============
 app.get('/api/campaign-talents', (req: Request, res: Response) => {
     try {
@@ -709,6 +765,59 @@ app.delete('/api/campaign-talents/:id', (req: Request, res: Response) => {
     try {
         campaignTalentsDB.delete(req.params.id);
         res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Campaign Talent Response (accept/decline)
+app.post('/api/campaign-talents/:id/respond', (req: Request, res: Response) => {
+    try {
+        const { action } = req.body;
+        if (!action || !['accept', 'decline'].includes(action)) {
+            return res.status(400).json({ error: 'Azione non valida. Usa "accept" o "decline".' });
+        }
+
+        const ct = campaignTalentsDB.getById(req.params.id) as any;
+        if (!ct) {
+            return res.status(404).json({ error: 'Assegnazione non trovata' });
+        }
+
+        const campaign = campaignsDB.getById(ct.campaign_id) as any;
+        const talent = talentsDB.getById(ct.talent_id) as any;
+        const talentName = talent ? `${talent.firstName} ${talent.lastName}` : 'Talent';
+
+        if (action === 'accept') {
+            campaignTalentsDB.update(req.params.id, {
+                stato: 'confermato',
+                responded_at: new Date().toISOString()
+            });
+
+            // Notify admin
+            notificationsDB.create({
+                id: `notif-${Date.now()}`,
+                type: 'campaign_accepted',
+                title: 'Campagna Accettata',
+                message: `${talentName} ha accettato la campagna "${campaign?.name || ''}"`,
+                link: `/campaigns`
+            });
+
+            res.json({ success: true, stato: 'confermato' });
+        } else {
+            // Decline: remove talent from campaign and notify admin
+            campaignTalentsDB.delete(req.params.id);
+
+            // Notify admin
+            notificationsDB.create({
+                id: `notif-${Date.now()}`,
+                type: 'campaign_declined',
+                title: 'Campagna Rifiutata',
+                message: `${talentName} ha rifiutato la campagna "${campaign?.name || ''}". Puoi invitare un altro talent.`,
+                link: `/campaigns`
+            });
+
+            res.json({ success: true, stato: 'rifiutato', removed: true });
+        }
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }
@@ -983,6 +1092,25 @@ app.put('/api/notifications/read-all', (req: Request, res: Response) => {
         const { userId } = req.query;
         notificationsDB.markAllAsRead(userId as string);
         res.json({ success: true });
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============== COMPANY SETTINGS API ==============
+app.get('/api/company-settings', (req: Request, res: Response) => {
+    try {
+        const settings = companySettingsDB.get();
+        res.json(settings);
+    } catch (error: any) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.put('/api/company-settings', (req: Request, res: Response) => {
+    try {
+        const settings = companySettingsDB.update(req.body);
+        res.json(settings);
     } catch (error: any) {
         res.status(500).json({ error: error.message });
     }

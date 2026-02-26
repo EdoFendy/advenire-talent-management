@@ -4,7 +4,7 @@ import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'r
 import {
   LayoutDashboard, Users, Briefcase, Wallet, Bell,
   Menu, X, LogOut, ChevronRight, Calendar as CalendarIcon,
-  Building2
+  Building2, Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -18,6 +18,7 @@ import TalentDashboard from './pages/TalentDashboard';
 import TalentCalendar from './pages/TalentCalendar';
 import Login from './pages/Login';
 import Clients from './pages/Clients';
+import CompanySettings from './pages/CompanySettings';
 
 // Context & Types
 import { AppProvider, useApp } from './context/AppContext';
@@ -74,7 +75,7 @@ const AppContent: React.FC = () => {
     isLoading, notifications
   } = useApp();
 
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(window.innerWidth >= 768);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -107,6 +108,7 @@ const AppContent: React.FC = () => {
     { icon: Building2, label: 'Clienti', path: '/clients' },
     { icon: Briefcase, label: 'Campagne', path: '/campaigns' },
     { icon: Wallet, label: 'Finanze', path: '/finance' },
+    { icon: Settings, label: 'Impostazioni', path: '/settings' },
   ];
 
   // Adapt campaignTalents to collaborations shape for legacy page compatibility
@@ -180,6 +182,14 @@ const AppContent: React.FC = () => {
         </div>
       </motion.aside>
 
+      {/* Mobile backdrop overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-h-screen relative">
         {/* Header */}
@@ -200,7 +210,7 @@ const AppContent: React.FC = () => {
           </div>
         </header>
 
-        <main className="flex-1 p-6 md:p-10 max-w-[1600px] w-full mx-auto">
+        <main className="flex-1 p-4 md:p-10 max-w-[1600px] w-full mx-auto">
           <AnimatePresence mode="wait">
             <Routes>
               {/* Admin Routes */}
@@ -245,6 +255,11 @@ const AppContent: React.FC = () => {
                     role={auth.user.role}
                     talents={talents}
                   />
+              } />
+
+              <Route path="/settings" element={
+                isTalent ? <Navigate to="/my-dashboard" /> :
+                  <CompanySettings />
               } />
 
               {/* Talent Routes */}

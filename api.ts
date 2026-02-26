@@ -150,6 +150,11 @@ export const campaignsApi = {
         apiRequest<{ success: boolean }>(`/campaigns/${id}`, {
             method: 'DELETE',
         }),
+
+    activate: (id: string) =>
+        apiRequest<any>(`/campaigns/${id}/activate`, {
+            method: 'PUT',
+        }),
 };
 
 // ============== CAMPAIGN TALENTS API ==============
@@ -177,6 +182,12 @@ export const campaignTalentsApi = {
     delete: (id: string) =>
         apiRequest<{ success: boolean }>(`/campaign-talents/${id}`, {
             method: 'DELETE',
+        }),
+
+    respond: (id: string, action: 'accept' | 'decline') =>
+        apiRequest<any>(`/campaign-talents/${id}/respond`, {
+            method: 'POST',
+            body: JSON.stringify({ action }),
         }),
 };
 
@@ -354,6 +365,17 @@ export const quotesApi = {
         }),
 };
 
+// ============== COMPANY SETTINGS API ==============
+export const companySettingsApi = {
+    get: () => apiRequest<any>('/company-settings'),
+
+    update: (updates: any) =>
+        apiRequest<any>('/company-settings', {
+            method: 'PUT',
+            body: JSON.stringify(updates),
+        }),
+};
+
 // ============== SEARCH API ==============
 export const searchApi = {
     global: (query: string) => apiRequest<any[]>(`/search?q=${encodeURIComponent(query)}`),
@@ -377,6 +399,7 @@ export const api = {
     costs: costsApi,
     quotes: quotesApi,
     notifications: notificationsApi,
+    companySettings: companySettingsApi,
     search: searchApi,
     analytics: analyticsApi,
 };

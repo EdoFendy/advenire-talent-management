@@ -28,44 +28,44 @@ const QUOTE_TEMPLATES: Record<string, { label: string; icon: any; items: QuoteIt
     label: 'Campagna Social',
     icon: Briefcase,
     items: [
-      { descrizione: 'Fee talent', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Produzione contenuti', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Gestione campagna', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Strategia e planning', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Report e analytics', quantita: 1, prezzo_unitario: 0, totale: 0 },
+      { descrizione: 'Fee talent', link_social: '', quantita: 1 },
+      { descrizione: 'Produzione contenuti', link_social: '', quantita: 1 },
+      { descrizione: 'Gestione campagna', link_social: '', quantita: 1 },
+      { descrizione: 'Strategia e planning', link_social: '', quantita: 1 },
+      { descrizione: 'Report e analytics', link_social: '', quantita: 1 },
     ]
   },
   shooting: {
     label: 'Shooting',
     icon: Camera,
     items: [
-      { descrizione: 'Fotografo / Videomaker', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Location', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Trucco e parrucco', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Styling', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Catering', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Post-produzione', quantita: 1, prezzo_unitario: 0, totale: 0 },
+      { descrizione: 'Fotografo / Videomaker', link_social: '', quantita: 1 },
+      { descrizione: 'Location', link_social: '', quantita: 1 },
+      { descrizione: 'Trucco e parrucco', link_social: '', quantita: 1 },
+      { descrizione: 'Styling', link_social: '', quantita: 1 },
+      { descrizione: 'Catering', link_social: '', quantita: 1 },
+      { descrizione: 'Post-produzione', link_social: '', quantita: 1 },
     ]
   },
   evento: {
     label: 'Evento',
     icon: Users,
     items: [
-      { descrizione: 'Venue / Location', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Catering', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Staff e hostess', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Allestimento', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Audio e luci', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Comunicazione e inviti', quantita: 1, prezzo_unitario: 0, totale: 0 },
+      { descrizione: 'Venue / Location', link_social: '', quantita: 1 },
+      { descrizione: 'Catering', link_social: '', quantita: 1 },
+      { descrizione: 'Staff e hostess', link_social: '', quantita: 1 },
+      { descrizione: 'Allestimento', link_social: '', quantita: 1 },
+      { descrizione: 'Audio e luci', link_social: '', quantita: 1 },
+      { descrizione: 'Comunicazione e inviti', link_social: '', quantita: 1 },
     ]
   },
   consulenza: {
     label: 'Consulenza',
     icon: MessageSquare,
     items: [
-      { descrizione: 'Ore consulenza', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Analisi e report', quantita: 1, prezzo_unitario: 0, totale: 0 },
-      { descrizione: 'Follow-up', quantita: 1, prezzo_unitario: 0, totale: 0 },
+      { descrizione: 'Ore consulenza', link_social: '', quantita: 1 },
+      { descrizione: 'Analisi e report', link_social: '', quantita: 1 },
+      { descrizione: 'Follow-up', link_social: '', quantita: 1 },
     ]
   }
 };
@@ -79,7 +79,7 @@ interface QuoteEditorProps {
 }
 
 const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) => {
-  const { clients, campaigns, addQuote, updateQuote, showToast } = useApp();
+  const { clients, campaigns, addQuote, updateQuote, showToast, companySettings } = useApp();
 
   const [titolo, setTitolo] = useState(quote?.titolo || '');
   const [tipo, setTipo] = useState<Quote['tipo']>(quote?.tipo || 'custom');
@@ -87,26 +87,18 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
   const [campaignId, setCampaignId] = useState(quote?.campaign_id || '');
   const [stato, setStato] = useState<Quote['stato']>(quote?.stato || 'bozza');
   const [note, setNote] = useState(quote?.note || '');
-  const [ivaPercent, setIvaPercent] = useState(quote?.iva_percent ?? 22);
   const [items, setItems] = useState<QuoteItem[]>(quote?.items || []);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const subtotale = useMemo(() => items.reduce((sum, item) => sum + item.totale, 0), [items]);
-  const ivaAmount = subtotale * (ivaPercent / 100);
-  const totale = subtotale + ivaAmount;
+  const [totaleManuale, setTotaleManuale] = useState(quote?.totale ?? 0);
 
   const addItem = () => {
-    setItems(prev => [...prev, { descrizione: '', quantita: 1, prezzo_unitario: 0, totale: 0 }]);
+    setItems(prev => [...prev, { descrizione: '', link_social: '', quantita: 1 }]);
   };
 
   const updateItem = (index: number, field: keyof QuoteItem, value: string | number) => {
     setItems(prev => prev.map((item, i) => {
       if (i !== index) return item;
-      const updated = { ...item, [field]: value };
-      if (field === 'quantita' || field === 'prezzo_unitario') {
-        updated.totale = updated.quantita * updated.prezzo_unitario;
-      }
-      return updated;
+      return { ...item, [field]: value };
     }));
   };
 
@@ -131,7 +123,7 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
     try {
       const data = {
         titolo, tipo, client_id: clientId || undefined, campaign_id: campaignId || undefined,
-        stato, note: note || undefined, subtotale, iva_percent: ivaPercent, totale, items
+        stato, note: note || undefined, subtotale: 0, iva_percent: 0, totale: totaleManuale, items
       };
       if (quote) {
         await updateQuote(quote.id, data);
@@ -155,12 +147,12 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
     text += `*DETTAGLIO VOCI:*\n`;
     items.forEach(item => {
       if (item.descrizione) {
-        text += `- ${item.descrizione}: ${item.quantita} x €${item.prezzo_unitario.toLocaleString()} = €${item.totale.toLocaleString()}\n`;
+        text += `- ${item.descrizione} (x${item.quantita})`;
+        if (item.link_social) text += ` | Link: ${item.link_social}`;
+        text += `\n`;
       }
     });
-    text += `\n*Subtotale:* €${subtotale.toLocaleString()}`;
-    text += `\n*IVA (${ivaPercent}%):* €${ivaAmount.toLocaleString()}`;
-    text += `\n*TOTALE:* €${totale.toLocaleString()}`;
+    text += `\n*TOTALE:* €${totaleManuale.toLocaleString()}`;
     if (note) text += `\n\nNote: ${note}`;
     navigator.clipboard.writeText(text);
     showToast('Preventivo copiato per WhatsApp', 'success');
@@ -168,6 +160,11 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
 
   const exportPDF = () => {
     const client = clientId ? clients.find(c => c.id === clientId) : null;
+    const cs = companySettings;
+    const companyName = cs?.ragione_sociale || 'Advenire';
+    const companyAddress = [cs?.indirizzo_via, cs?.indirizzo_cap, cs?.indirizzo_citta, cs?.indirizzo_paese].filter(Boolean).join(', ');
+    const companyContacts = [cs?.email, cs?.telefono].filter(Boolean).join(' — ');
+    const companyFiscal = [cs?.piva ? `P.IVA ${cs.piva}` : '', cs?.codice_fiscale ? `C.F. ${cs.codice_fiscale}` : ''].filter(Boolean).join(' — ');
     const printContent = `
       <html>
         <head>
@@ -177,6 +174,7 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
             .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 40px; border-bottom: 3px solid #111; padding-bottom: 20px; }
             .logo { font-size: 28px; font-weight: 900; text-transform: uppercase; letter-spacing: -1px; }
             .logo-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 3px; color: #666; }
+            .company-info { font-size: 9px; color: #888; margin-top: 6px; line-height: 1.6; }
             .meta { text-align: right; font-size: 11px; color: #666; }
             .meta strong { color: #111; }
             h1 { font-size: 22px; text-transform: uppercase; margin: 0 0 5px 0; }
@@ -196,8 +194,13 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
         <body>
           <div class="header">
             <div>
-              <div class="logo">Advenire</div>
+              <div class="logo">${companyName}</div>
               <div class="logo-sub">Talent Management</div>
+              <div class="company-info">
+                ${companyAddress ? `${companyAddress}<br/>` : ''}
+                ${companyContacts ? `${companyContacts}<br/>` : ''}
+                ${companyFiscal ? `${companyFiscal}` : ''}
+              </div>
             </div>
             <div class="meta">
               <strong>Preventivo</strong><br/>
@@ -213,29 +216,26 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
 
           <table>
             <thead>
-              <tr><th>Descrizione</th><th style="text-align:right">Qtà</th><th style="text-align:right">Prezzo Unit.</th><th style="text-align:right">Totale</th></tr>
+              <tr><th>Descrizione</th><th>Link Social</th><th style="text-align:right">Qtà</th></tr>
             </thead>
             <tbody>
               ${items.filter(item => item.descrizione).map(item => `
                 <tr>
                   <td>${item.descrizione}</td>
+                  <td>${item.link_social ? `<a href="${item.link_social}" target="_blank" style="color:#2563eb;text-decoration:underline">${item.link_social}</a>` : '-'}</td>
                   <td class="num">${item.quantita}</td>
-                  <td class="num">€${item.prezzo_unitario.toLocaleString()}</td>
-                  <td class="num">€${item.totale.toLocaleString()}</td>
                 </tr>
               `).join('')}
             </tbody>
           </table>
 
           <div class="totals">
-            <div class="row"><span>Subtotale</span><span>€${subtotale.toLocaleString()}</span></div>
-            <div class="row"><span>IVA (${ivaPercent}%)</span><span>€${ivaAmount.toLocaleString()}</span></div>
-            <div class="row final"><span>TOTALE</span><span>€${totale.toLocaleString()}</span></div>
+            <div class="row final"><span>TOTALE</span><span>€${totaleManuale.toLocaleString()}</span></div>
           </div>
 
           ${note ? `<div class="notes"><strong>Note:</strong> ${note}</div>` : ''}
 
-          <div class="footer">Advenire Talent Management — Preventivo generato il ${format(new Date(), 'dd/MM/yyyy')}</div>
+          <div class="footer">${companyName} — Preventivo generato il ${format(new Date(), 'dd/MM/yyyy')}${cs?.pec ? ` — PEC: ${cs.pec}` : ''}${cs?.website ? ` — ${cs.website}` : ''}</div>
         </body>
       </html>
     `;
@@ -326,15 +326,7 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                 <option value="rifiutato">Rifiutato</option>
               </select>
             </div>
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">IVA (%)</label>
-              <input
-                type="number" min={0} max={100}
-                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
-                value={ivaPercent}
-                onChange={e => setIvaPercent(Number(e.target.value))}
-              />
-            </div>
+            <div />
           </div>
 
           {/* Templates */}
@@ -386,9 +378,8 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
               {/* Header */}
               <div className="grid grid-cols-12 gap-2 px-3 py-1">
                 <div className="col-span-5 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Descrizione</div>
+                <div className="col-span-4 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Link Social</div>
                 <div className="col-span-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest text-right">Qtà</div>
-                <div className="col-span-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest text-right">Prezzo Unit.</div>
-                <div className="col-span-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest text-right">Totale</div>
                 <div className="col-span-1" />
               </div>
 
@@ -403,6 +394,15 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                       onChange={e => updateItem(idx, 'descrizione', e.target.value)}
                     />
                   </div>
+                  <div className="col-span-4">
+                    <input
+                      type="text"
+                      className="w-full bg-transparent text-sm text-white font-bold focus:outline-none placeholder-zinc-600"
+                      placeholder="https://..."
+                      value={item.link_social}
+                      onChange={e => updateItem(idx, 'link_social', e.target.value)}
+                    />
+                  </div>
                   <div className="col-span-2">
                     <input
                       type="number" min={1}
@@ -410,20 +410,6 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                       value={item.quantita}
                       onChange={e => updateItem(idx, 'quantita', Number(e.target.value))}
                     />
-                  </div>
-                  <div className="col-span-2">
-                    <div className="flex items-center justify-end">
-                      <span className="text-zinc-600 text-xs mr-1">€</span>
-                      <input
-                        type="number" min={0}
-                        className="w-full bg-transparent text-sm text-white font-bold focus:outline-none text-right"
-                        value={item.prezzo_unitario || ''}
-                        onChange={e => updateItem(idx, 'prezzo_unitario', Number(e.target.value))}
-                      />
-                    </div>
-                  </div>
-                  <div className="col-span-2 text-right">
-                    <span className="text-sm font-black text-white">€{item.totale.toLocaleString()}</span>
                   </div>
                   <div className="col-span-1 text-right">
                     <button onClick={() => removeItem(idx)} className="p-1 text-zinc-600 hover:text-red-400 transition-all">
@@ -442,19 +428,18 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
           </div>
 
           {/* Totals */}
-          <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-5 space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-zinc-400">Subtotale</span>
-              <span className="text-lg font-black text-white">€{subtotale.toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-zinc-400">IVA ({ivaPercent}%)</span>
-              <span className="text-sm font-bold text-zinc-400">€{ivaAmount.toLocaleString()}</span>
-            </div>
-            <div className="h-px bg-white/10" />
+          <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-5">
             <div className="flex justify-between items-center">
               <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Totale</span>
-              <span className="text-2xl font-black text-white">€{totale.toLocaleString()}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-400 text-lg font-black">€</span>
+                <input
+                  type="number" min={0}
+                  className="w-40 bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-2xl text-white font-black focus:border-blue-500/50 focus:outline-none text-right"
+                  value={totaleManuale || ''}
+                  onChange={e => setTotaleManuale(Number(e.target.value))}
+                />
+              </div>
             </div>
           </div>
 
@@ -837,7 +822,7 @@ const Finance: React.FC<FinanceProps> = ({ campaigns, collaborations, extraCosts
       </header>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
           <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Fatturato</p>
           <p className="text-2xl font-black text-white">€{analytics.totalRevenue.toLocaleString()}</p>
@@ -866,7 +851,7 @@ const Finance: React.FC<FinanceProps> = ({ campaigns, collaborations, extraCosts
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3 bg-zinc-900/40 p-2 rounded-xl border border-white/5 w-fit">
+      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 bg-zinc-900/40 p-2 rounded-xl border border-white/5 sm:w-fit">
         <div className="flex items-center px-3 py-1.5 border-r border-white/5">
           <Filter size={14} className="text-zinc-500 mr-2" />
           <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Filtra</span>
