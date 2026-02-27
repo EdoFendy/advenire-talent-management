@@ -101,9 +101,7 @@ interface CalendarEvent {
   isStart?: boolean; isEnd?: boolean; isOngoing?: boolean;
 }
 
-interface DashboardProps { appointments: any[]; talents: any[]; collaborations: any[] }
-
-const Dashboard: React.FC<DashboardProps> = () => {
+const Dashboard: React.FC = () => {
   const { tasks, addTask, updateTask, deleteTask, homeNote, updateHomeNote, campaigns, appointments, campaignTalents, talents } = useApp();
 
   const [currentMonth, setCurrentMonth] = useState(new Date());

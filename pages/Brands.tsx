@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Grid, List, Plus, Globe, Phone, Mail, Briefcase, Trash2, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brand } from '../types';
@@ -15,15 +15,47 @@ import { AnimatedContainer } from '@/components/ui/animated-container';
 import { SearchInput } from '@/components/ui/search-input';
 import { staggerContainer, staggerItem } from '@/lib/animations';
 
-interface BrandsProps {
-    brands: Brand[];
-    addBrand: (brand: Omit<Brand, 'id'>) => Promise<Brand>;
-    updateBrand: (id: string, updates: Partial<Brand>) => Promise<Brand>;
-    deleteBrand: (id: string) => Promise<void>;
+const STORAGE_KEY = 'advenire_erp_brands';
+
+function loadBrands(): Brand[] {
+    try {
+        const data = localStorage.getItem(STORAGE_KEY);
+        return data ? JSON.parse(data) : [];
+    } catch { return []; }
 }
 
-const Brands: React.FC<BrandsProps> = ({ brands, addBrand, updateBrand, deleteBrand }) => {
+function saveBrands(list: Brand[]) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+}
+
+const Brands: React.FC = () => {
     const { showToast } = useApp();
+    const [brands, setBrands] = useState<Brand[]>(loadBrands);
+
+    const persistBrands = useCallback((updated: Brand[]) => {
+        setBrands(updated);
+        saveBrands(updated);
+    }, []);
+
+    const addBrand = useCallback(async (data: Omit<Brand, 'id'>): Promise<Brand> => {
+        const newBrand: Brand = { ...data, id: crypto.randomUUID() };
+        persistBrands([...brands, newBrand]);
+        showToast('Brand creato', 'success');
+        return newBrand;
+    }, [brands, persistBrands, showToast]);
+
+    const updateBrand = useCallback(async (id: string, updates: Partial<Brand>): Promise<Brand> => {
+        const updated = brands.map(b => b.id === id ? { ...b, ...updates } : b);
+        persistBrands(updated);
+        const brand = updated.find(b => b.id === id)!;
+        showToast('Brand aggiornato', 'success');
+        return brand;
+    }, [brands, persistBrands, showToast]);
+
+    const deleteBrand = useCallback(async (id: string): Promise<void> => {
+        persistBrands(brands.filter(b => b.id !== id));
+        showToast('Brand eliminato', 'success');
+    }, [brands, persistBrands, showToast]);
     const [view, setView] = useState<'grid' | 'list'>('grid');
     const [search, setSearch] = useState('');
     const [showModal, setShowModal] = useState(false);

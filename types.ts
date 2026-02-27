@@ -271,6 +271,7 @@ export interface Collaboration {
   paymentStatus: string;
   paidAmount: number;
   notes: string;
+  deadline?: string;
 }
 
 export interface Brand {
@@ -281,6 +282,9 @@ export interface Brand {
   phone: string;
   notes: string;
   logoUrl?: string;
+  website?: string;
+  vat?: string;
+  address?: string;
 }
 
 export interface CompanySettings {

@@ -44,10 +44,8 @@ const TABS: { id: TabId; label: string }[] = [
 
 interface TalentProfileProps {
   talents: Talent[];
-  collaborations: any[];
   appointments: Appointment[];
   campaigns: Campaign[];
-  addCollaboration: (data: any) => Promise<any>;
   role: string;
 }
 

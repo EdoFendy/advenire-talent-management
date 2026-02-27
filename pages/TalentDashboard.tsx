@@ -13,7 +13,7 @@ import {
   startOfWeek, endOfWeek, isSameMonth, isToday as isDateToday
 } from 'date-fns';
 import { it } from 'date-fns/locale';
-import { Talent, Appointment, Collaboration, Campaign, AppointmentType, CampaignTalentStatus } from '../types';
+import { Talent, Appointment, Campaign, AppointmentType, CampaignTalentStatus } from '../types';
 import { useApp } from '../context/AppContext';
 
 import { GlassCard } from '@/components/ui/glass-card';
@@ -60,13 +60,12 @@ interface TalentDashboardProps {
   talentId: string;
   talents: Talent[];
   appointments: Appointment[];
-  collaborations: Collaboration[];
   campaigns: Campaign[];
 }
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-const TalentDashboard: React.FC<TalentDashboardProps> = ({ talentId, talents, appointments, collaborations, campaigns }) => {
+const TalentDashboard: React.FC<TalentDashboardProps> = ({ talentId, talents, appointments, campaigns }) => {
   const navigate = useNavigate();
   const {
     notifications, campaignTalents, respondToCampaignAssignment,
@@ -101,17 +100,16 @@ const TalentDashboard: React.FC<TalentDashboardProps> = ({ talentId, talents, ap
 
   // ── Stats ──────────────────────────────────────────────────────────────
   const activeCampaignsCount = useMemo(() => {
-    const myCollabs = collaborations.filter(c => c.talentId === talentId);
-    const activeCampaignIds = new Set(myCollabs.map(c => c.campaignId));
-    return campaigns.filter(c => activeCampaignIds.has(c.id) && c.status === 'Attiva').length;
-  }, [collaborations, campaigns, talentId]);
+    return myCampaigns.filter(c => c.status === 'Attiva').length;
+  }, [myCampaigns]);
 
   const pendingEarnings = useMemo(() => {
-    const myCollabs = collaborations.filter(c => c.talentId === talentId);
-    const totalEarnings = myCollabs.reduce((acc, c) => acc + c.fee, 0);
-    const paid = myCollabs.filter(c => c.paymentStatus === 'Saldato').reduce((acc, c) => acc + c.fee, 0);
+    const totalEarnings = myCampaignTalents.reduce((acc, ct) => acc + ct.compenso_lordo, 0);
+    const paid = myCampaignTalents
+      .filter(ct => ct.stato === 'pagato')
+      .reduce((acc, ct) => acc + ct.compenso_lordo, 0);
     return totalEarnings - paid;
-  }, [collaborations, talentId]);
+  }, [myCampaignTalents]);
 
   const nextEvent = useMemo(() => {
     return appointments

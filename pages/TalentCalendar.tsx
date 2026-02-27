@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
     format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
     addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth
@@ -7,11 +7,12 @@ import {
 import { it } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Calendar as CalendarIcon,
-    Video, Camera, Truck, MessageSquare, X,
-    User, Briefcase, Bell
+    Video, Camera, Truck, MessageSquare,
+    Briefcase, Bell, Clock, Flag
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Appointment, Collaboration, Campaign, AppointmentType, CollaborationStatus } from '../types';
+import { AppointmentType } from '../types';
+import { useApp } from '../context/AppContext';
 
 import { GlassCard } from '@/components/ui/glass-card';
 import { Button } from '@/components/ui/button';
@@ -23,25 +24,40 @@ import { staggerContainer, staggerItem } from '@/lib/animations';
 
 interface TalentCalendarProps {
     talentId: string;
-    appointments: Appointment[];
-    collaborations: Collaboration[];
-    campaigns: Campaign[];
 }
 
-const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId, appointments, collaborations, campaigns }) => {
+interface CalendarItem {
+    id: string;
+    title: string;
+    itemType: 'appointment' | 'campaign' | 'deadline';
+    description?: string;
+    location?: string;
+    status?: string;
+    appointmentType?: AppointmentType;
+    campaignLabel?: string;
+    brand?: string;
+}
+
+const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
+    const { campaignTalents, campaigns, appointments } = useApp();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
-    // Filter items for the current talent
+    // My campaign talents & campaigns (same logic as TalentDashboard)
+    const myCampaignTalents = useMemo(() =>
+        campaignTalents.filter(ct => ct.talent_id === talentId),
+        [campaignTalents, talentId]);
+
+    const myCampaigns = useMemo(() => {
+        const ids = new Set(myCampaignTalents.map(ct => ct.campaign_id));
+        return campaigns.filter(c => ids.has(c.id));
+    }, [campaigns, myCampaignTalents]);
+
     const myAppointments = useMemo(() =>
         appointments.filter(a => a.talentId === talentId),
         [appointments, talentId]);
 
-    const myCollaborations = useMemo(() =>
-        collaborations.filter(c => c.talentId === talentId && c.status !== CollaborationStatus.CANCELLED),
-        [collaborations, talentId]);
-
-    // Calendar logic
+    // Calendar grid days
     const monthCalendarDays = useMemo(() => {
         const monthStart = startOfMonth(currentDate);
         const monthEnd = endOfMonth(monthStart);
@@ -54,32 +70,106 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId, appointments,
         setCurrentDate(direction === 'prev' ? subMonths(currentDate, 1) : addMonths(currentDate, 1));
     };
 
-    const getTypeIcon = (type: AppointmentType | 'collaboration') => {
-        switch (type) {
+    const getTypeIcon = (itemType: string, appointmentType?: AppointmentType) => {
+        if (itemType === 'campaign') return <Briefcase size={12} />;
+        if (itemType === 'deadline') return <Flag size={12} />;
+        switch (appointmentType) {
             case AppointmentType.SHOOTING: return <Camera size={12} />;
             case AppointmentType.PUBLICATION: return <Video size={12} />;
             case AppointmentType.CALL: return <MessageSquare size={12} />;
             case AppointmentType.DELIVERY: return <Truck size={12} />;
-            case 'collaboration': return <Briefcase size={12} />;
             default: return <CalendarIcon size={12} />;
         }
     };
 
-    const getDayItems = (day: Date) => {
-        const apps = myAppointments.filter(app => isSameDay(new Date(app.date), day));
-        const collabs = myCollaborations.filter(c => c.deadline && isSameDay(new Date(c.deadline), day));
+    const getDayItems = useCallback((day: Date): CalendarItem[] => {
+        const dayStr = format(day, 'yyyy-MM-dd');
+        const items: CalendarItem[] = [];
 
-        return [
-            ...apps.map(a => ({ ...a, itemType: 'appointment' as const })),
-            ...collabs.map(c => ({
-                id: c.id,
-                brand: c.brand,
-                type: 'Scadenza Consegna',
-                itemType: 'collaboration' as const,
-                description: c.notes,
-                status: c.status
-            }))
-        ];
+        // Appointments
+        myAppointments.forEach(app => {
+            if (app.date === dayStr) {
+                items.push({
+                    id: `app-${app.id}`,
+                    title: app.brand,
+                    itemType: 'appointment',
+                    appointmentType: app.type,
+                    description: app.description,
+                    location: app.location,
+                    status: app.status,
+                    brand: app.brand,
+                });
+            }
+            if (app.deadline && app.deadline === dayStr) {
+                items.push({
+                    id: `app-dl-${app.id}`,
+                    title: `Deadline: ${app.brand}`,
+                    itemType: 'deadline',
+                    description: `Scadenza ${app.type}`,
+                    brand: app.brand,
+                });
+            }
+        });
+
+        // Campaign events
+        myCampaigns.forEach(c => {
+            if (c.data_inizio === dayStr) {
+                items.push({
+                    id: `camp-start-${c.id}`,
+                    title: c.name,
+                    itemType: 'campaign',
+                    campaignLabel: 'Inizio',
+                    description: c.brand ? `Inizio - ${c.brand}` : 'Inizio campagna',
+                    brand: c.brand || c.name,
+                });
+            }
+            if (c.data_fine === dayStr) {
+                items.push({
+                    id: `camp-end-${c.id}`,
+                    title: c.name,
+                    itemType: 'campaign',
+                    campaignLabel: 'Fine',
+                    description: c.brand ? `Fine - ${c.brand}` : 'Fine campagna',
+                    brand: c.brand || c.name,
+                });
+            }
+            if (c.deadline === dayStr) {
+                items.push({
+                    id: `camp-dl-${c.id}`,
+                    title: `Deadline: ${c.name}`,
+                    itemType: 'deadline',
+                    campaignLabel: 'Deadline',
+                    description: c.brand ? `Deadline - ${c.brand}` : 'Deadline campagna',
+                    brand: c.brand || c.name,
+                });
+            }
+        });
+
+        return items;
+    }, [myAppointments, myCampaigns]);
+
+    const getItemColor = (itemType: string) => {
+        switch (itemType) {
+            case 'appointment': return { bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary' };
+            case 'campaign': return { bg: 'bg-purple-500/10', border: 'border-purple-500', text: 'text-purple-400' };
+            case 'deadline': return { bg: 'bg-destructive/10', border: 'border-destructive', text: 'text-destructive' };
+            default: return { bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary' };
+        }
+    };
+
+    const getBadgeVariant = (itemType: string): "default" | "destructive" | "secondary" => {
+        switch (itemType) {
+            case 'appointment': return 'default';
+            case 'campaign': return 'secondary';
+            case 'deadline': return 'destructive';
+            default: return 'default';
+        }
+    };
+
+    const getBadgeLabel = (item: CalendarItem) => {
+        if (item.itemType === 'deadline') return 'Deadline';
+        if (item.itemType === 'campaign') return item.campaignLabel || 'Campagna';
+        return item.appointmentType || 'Appuntamento';
     };
 
     return (
@@ -87,7 +177,7 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId, appointments,
             {/* Header */}
             <PageHeader
                 title="Il Mio Calendario"
-                subtitle="Gestione scadenze e appuntamenti"
+                subtitle="Gestione campagne, scadenze e appuntamenti"
                 actions={
                     <div className="flex items-center gap-3">
                         <Button
@@ -174,30 +264,34 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId, appointments,
                                     </span>
                                     {dayItems.length > 0 && currentMonth && (
                                         <div className="flex gap-1">
-                                            {dayItems.some(i => i.itemType === 'collaboration') && (
-                                                <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" title="Scadenza" />
+                                            {dayItems.some(i => i.itemType === 'deadline') && (
+                                                <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
                                             )}
-                                            <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            {dayItems.some(i => i.itemType === 'campaign') && (
+                                                <div className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                                            )}
+                                            {dayItems.some(i => i.itemType === 'appointment') && (
+                                                <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            )}
                                         </div>
                                     )}
                                 </div>
 
                                 <div className="space-y-1">
-                                    {dayItems.slice(0, 3).map((item, iIndex) => (
-                                        <div
-                                            key={iIndex}
-                                            className={`
-                                                px-2 py-1 rounded-md text-[9px] font-bold border-l-2 flex items-center gap-1
-                                                ${item.itemType === 'collaboration'
-                                                    ? 'bg-destructive/10 border-destructive text-destructive'
-                                                    : 'bg-primary/10 border-primary text-primary'
-                                                }
-                                            `}
-                                        >
-                                            {getTypeIcon(item.itemType === 'appointment' ? (item as Appointment).type : 'collaboration')}
-                                            <span className="truncate">{item.brand}</span>
-                                        </div>
-                                    ))}
+                                    {dayItems.slice(0, 3).map((item) => {
+                                        const colors = getItemColor(item.itemType);
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className={`px-2 py-1 rounded-md text-[9px] font-bold border-l-2 flex items-center gap-1 ${colors.bg} ${colors.border} ${colors.text}`}
+                                            >
+                                                {getTypeIcon(item.itemType, item.appointmentType)}
+                                                <span className="truncate">
+                                                    {item.campaignLabel ? `${item.campaignLabel}: ` : ''}{item.brand || item.title}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
                                     {dayItems.length > 3 && (
                                         <div className="text-[8px] font-bold text-muted-foreground text-center uppercase tracking-tight">
                                             + {dayItems.length - 3} altri
@@ -211,14 +305,18 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId, appointments,
             </GlassCard>
 
             {/* Legend */}
-            <GlassCard className="flex items-center gap-8 px-6 py-3 w-fit">
+            <GlassCard className="flex flex-wrap items-center gap-6 px-6 py-3 w-fit">
                 <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-primary" />
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Appuntamenti</span>
                 </div>
                 <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-purple-500" />
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Campagne</span>
+                </div>
+                <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Scadenze Collaborazioni</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Deadline</span>
                 </div>
             </GlassCard>
 
@@ -235,55 +333,52 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId, appointments,
                     </DialogHeader>
 
                     <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
-                        {selectedDay && getDayItems(selectedDay).map((item, idx) => (
-                            <GlassCard
-                                key={idx}
-                                variant={item.itemType === 'collaboration' ? 'default' : 'default'}
-                                className={`p-5 ${item.itemType === 'collaboration'
-                                    ? 'border-destructive/20 bg-destructive/[0.04]'
-                                    : ''
-                                }`}
-                            >
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1.5">
-                                            {item.itemType === 'collaboration' ? (
-                                                <Badge variant="destructive">Scadenza</Badge>
-                                            ) : (
-                                                <Badge variant="default">{(item as Appointment).type}</Badge>
-                                            )}
+                        {selectedDay && getDayItems(selectedDay).map((item) => {
+                            const colors = getItemColor(item.itemType);
+                            return (
+                                <GlassCard
+                                    key={item.id}
+                                    className={`p-5 ${item.itemType === 'deadline' ? 'border-destructive/20 bg-destructive/[0.04]' : item.itemType === 'campaign' ? 'border-purple-500/20 bg-purple-500/[0.04]' : ''}`}
+                                >
+                                    <div className="flex justify-between items-start mb-3">
+                                        <div>
+                                            <div className="flex items-center gap-2 mb-1.5">
+                                                <Badge variant={getBadgeVariant(item.itemType)}>
+                                                    {getBadgeLabel(item)}
+                                                </Badge>
+                                            </div>
+                                            <h4 className="text-lg font-black text-foreground tracking-tight">
+                                                {item.brand || item.title}
+                                            </h4>
                                         </div>
-                                        <h4 className="text-lg font-black text-foreground tracking-tight">
-                                            {item.brand}
-                                        </h4>
-                                    </div>
-                                    <div className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-muted-foreground">
-                                        {getTypeIcon(item.itemType === 'appointment' ? (item as Appointment).type : 'collaboration')}
-                                    </div>
-                                </div>
-
-                                {item.description && (
-                                    <p className="text-muted-foreground text-sm leading-relaxed mb-3">
-                                        {item.description}
-                                    </p>
-                                )}
-
-                                <div className="flex items-center gap-4">
-                                    {item.itemType === 'appointment' && (item as Appointment).location && (
-                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                                            <Truck size={12} className="text-primary" />
-                                            <span>{(item as Appointment).location}</span>
+                                        <div className={`w-10 h-10 rounded-xl bg-white/[0.06] border border-white/[0.08] flex items-center justify-center ${colors.text}`}>
+                                            {getTypeIcon(item.itemType, item.appointmentType)}
                                         </div>
+                                    </div>
+
+                                    {item.description && (
+                                        <p className="text-muted-foreground text-sm leading-relaxed mb-3">
+                                            {item.description}
+                                        </p>
                                     )}
-                                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                                        <Bell size={12} className={item.itemType === 'collaboration' ? 'text-destructive' : 'text-muted-foreground'} />
-                                        <span className="uppercase tracking-widest">
-                                            {item.itemType === 'collaboration' ? 'Entro il termine giornata' : 'Pianificato'}
-                                        </span>
+
+                                    <div className="flex items-center gap-4">
+                                        {item.location && (
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                                                <Truck size={12} className="text-primary" />
+                                                <span>{item.location}</span>
+                                            </div>
+                                        )}
+                                        <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
+                                            <Bell size={12} className={item.itemType === 'deadline' ? 'text-destructive' : item.itemType === 'campaign' ? 'text-purple-400' : 'text-muted-foreground'} />
+                                            <span className="uppercase tracking-widest">
+                                                {item.itemType === 'deadline' ? 'Scadenza' : item.itemType === 'campaign' ? (item.campaignLabel || 'Campagna') : 'Pianificato'}
+                                            </span>
+                                        </div>
                                     </div>
-                                </div>
-                            </GlassCard>
-                        ))}
+                                </GlassCard>
+                            );
+                        })}
                     </div>
                 </DialogContent>
             </Dialog>

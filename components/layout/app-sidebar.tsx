@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   LayoutDashboard, Users, Briefcase, Wallet, Bell,
-  LogOut, Calendar as CalendarIcon, Building2, Settings
+  LogOut, Calendar as CalendarIcon, Building2, Settings, Tag
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useApp } from '@/context/AppContext';
@@ -16,6 +16,7 @@ const adminNavItems = [
   { icon: Users, label: 'Roster', path: '/roster' },
   { icon: Building2, label: 'Clienti', path: '/clients' },
   { icon: Briefcase, label: 'Campagne', path: '/campaigns' },
+  { icon: Tag, label: 'Brand', path: '/brands' },
   { icon: Wallet, label: 'Finanze', path: '/finance' },
   { icon: Settings, label: 'Impostazioni', path: '/settings' },
 ];

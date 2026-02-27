@@ -14,6 +14,7 @@ import TalentCalendar from './pages/TalentCalendar';
 import Login from './pages/Login';
 import Clients from './pages/Clients';
 import CompanySettings from './pages/CompanySettings';
+import Brands from './pages/Brands';
 
 // Layout & Context
 import { AppProvider, useApp } from './context/AppContext';
@@ -25,7 +26,7 @@ import { Button } from './components/ui/button';
 const AppContent: React.FC = () => {
   const {
     auth, talents, campaigns, campaignTalents, appointments, income, extraCosts,
-    addCampaignTalent, isLoading
+    isLoading
   } = useApp();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -48,18 +49,24 @@ const AppContent: React.FC = () => {
 
   const isTalent = auth.user.role === 'talent';
 
-  const collaborationsCompat = campaignTalents.map(ct => ({
-    id: ct.id,
-    talentId: ct.talent_id,
-    brand: '',
-    campaignId: ct.campaign_id,
-    type: '',
-    fee: ct.compenso_lordo,
-    status: ct.stato === 'confermato' ? 'Confermata' : ct.stato === 'consegnato' ? 'Completata' : 'Bozza',
-    paymentStatus: ct.stato === 'pagato' ? 'Saldato' : 'Non Saldato',
-    paidAmount: ct.stato === 'pagato' ? ct.compenso_lordo : 0,
-    notes: ct.note || ''
-  }));
+  const collaborationsCompat = campaignTalents.map(ct => {
+    const campaign = campaigns.find(c => c.id === ct.campaign_id);
+    return {
+      id: ct.id,
+      talentId: ct.talent_id,
+      brand: campaign?.brand || campaign?.name || '',
+      campaignId: ct.campaign_id,
+      type: campaign?.tipo || '',
+      fee: ct.compenso_lordo,
+      status: ct.stato === 'confermato' ? 'Confermata'
+            : ct.stato === 'consegnato' || ct.stato === 'pagato' ? 'Completata'
+            : ct.stato === 'rifiutato' ? 'Cancellata' : 'Bozza',
+      paymentStatus: ct.stato === 'pagato' ? 'Saldato' : 'Non Saldato',
+      paidAmount: ct.stato === 'pagato' ? ct.compenso_lordo : 0,
+      notes: ct.note || '',
+      deadline: ct.deadline || campaign?.deadline,
+    };
+  });
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
@@ -74,29 +81,29 @@ const AppContent: React.FC = () => {
           <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
               <Route path="/" element={
-                isTalent ? <Navigate to="/my-dashboard" /> :
-                  <Dashboard appointments={appointments} talents={talents} collaborations={collaborationsCompat as any} />
+                isTalent ? <Navigate to="/my-dashboard" /> : <Dashboard />
               } />
               <Route path="/roster" element={isTalent ? <Navigate to="/my-dashboard" /> : <Roster />} />
               <Route path="/clients" element={isTalent ? <Navigate to="/my-dashboard" /> : <Clients />} />
               <Route path="/roster/:id" element={
                 isTalent ? <Navigate to="/my-dashboard" /> :
-                  <TalentProfile talents={talents} collaborations={collaborationsCompat as any} appointments={appointments} campaigns={campaigns} addCollaboration={addCampaignTalent as any} role={auth.user.role} />
+                  <TalentProfile talents={talents} appointments={appointments} campaigns={campaigns} role={auth.user.role} />
               } />
               <Route path="/campaigns" element={isTalent ? <Navigate to="/my-dashboard" /> : <Campaigns />} />
               <Route path="/finance" element={
                 isTalent ? <Navigate to="/my-finance" /> :
                   <Finance campaigns={campaigns} collaborations={collaborationsCompat as any} extraCosts={extraCosts} income={income} role={auth.user.role} talents={talents} />
               } />
+              <Route path="/brands" element={isTalent ? <Navigate to="/my-dashboard" /> : <Brands />} />
               <Route path="/settings" element={isTalent ? <Navigate to="/my-dashboard" /> : <CompanySettings />} />
 
               <Route path="/my-dashboard" element={
                 !isTalent ? <Navigate to="/" /> :
-                  <TalentDashboard talentId={auth.user.talentId || ''} talents={talents} appointments={appointments} collaborations={collaborationsCompat as any} campaigns={campaigns} />
+                  <TalentDashboard talentId={auth.user.talentId || ''} talents={talents} appointments={appointments} campaigns={campaigns} />
               } />
               <Route path="/my-calendar" element={
                 !isTalent ? <Navigate to="/" /> :
-                  <TalentCalendar talentId={auth.user.talentId || ''} appointments={appointments} collaborations={collaborationsCompat as any} campaigns={campaigns} />
+                  <TalentCalendar talentId={auth.user.talentId || ''} />
               } />
               <Route path="/my-finance" element={
                 !isTalent ? <Navigate to="/" /> :
