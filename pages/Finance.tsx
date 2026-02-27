@@ -11,6 +11,19 @@ import { it } from 'date-fns/locale';
 import { Campaign, Collaboration, ExtraCost, Income, Role, Talent, Quote, QuoteItem } from '../types';
 import { useApp } from '../context/AppContext';
 
+import { GlassCard } from '@/components/ui/glass-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
+import { PageHeader } from '@/components/ui/page-header';
+import { AnimatedContainer } from '@/components/ui/animated-container';
+import { StatCard } from '@/components/ui/stat-card';
+import { staggerContainer, staggerItem } from '@/lib/animations';
+
 interface FinanceProps {
   campaigns: Campaign[];
   collaborations: Collaboration[];
@@ -250,30 +263,23 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-lg" />
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-        className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-4xl shadow-3xl overflow-hidden max-h-[90vh] flex flex-col"
-      >
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0">
         {/* Header */}
-        <div className="p-6 border-b border-white/5 flex justify-between items-center shrink-0">
-          <div>
-            <h3 className="text-xl font-black text-white uppercase tracking-tight">
+        <div className="p-6 border-b border-white/[0.06] flex justify-between items-center shrink-0">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">
               {quote ? 'Modifica Preventivo' : 'Nuovo Preventivo'}
-            </h3>
-            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">Preventivatore Advenire</p>
-          </div>
+            </DialogTitle>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">Preventivatore Advenire</p>
+          </DialogHeader>
           <div className="flex items-center gap-2">
-            <button onClick={copyWhatsApp} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-emerald-400 transition-all" title="Copia per WhatsApp">
+            <Button variant="ghost" size="icon" onClick={copyWhatsApp} title="Copia per WhatsApp" className="text-muted-foreground hover:text-emerald-400">
               <Copy size={16} />
-            </button>
-            <button onClick={exportPDF} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-blue-400 transition-all" title="Esporta PDF">
+            </Button>
+            <Button variant="ghost" size="icon" onClick={exportPDF} title="Esporta PDF" className="text-muted-foreground hover:text-blue-400">
               <Download size={16} />
-            </button>
-            <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-              <X size={18} />
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -281,20 +287,20 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
           {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Titolo *</label>
-              <input
-                type="text" required
-                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
+            <div className="col-span-2 space-y-1.5">
+              <Label>Titolo *</Label>
+              <Input
+                type="text"
+                required
                 placeholder="es. Preventivo Campagna Estate 2026"
                 value={titolo}
                 onChange={e => setTitolo(e.target.value)}
               />
             </div>
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Cliente</label>
+            <div className="space-y-1.5">
+              <Label>Cliente</Label>
               <select
-                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none appearance-none"
+                className="flex h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-foreground backdrop-blur-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all duration-200 appearance-none"
                 value={clientId}
                 onChange={e => setClientId(e.target.value)}
               >
@@ -302,10 +308,10 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                 {clients.map(c => <option key={c.id} value={c.id}>{c.ragione_sociale}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Campagna</label>
+            <div className="space-y-1.5">
+              <Label>Campagna</Label>
               <select
-                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none appearance-none"
+                className="flex h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-foreground backdrop-blur-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all duration-200 appearance-none"
                 value={campaignId}
                 onChange={e => setCampaignId(e.target.value)}
               >
@@ -313,10 +319,10 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                 {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-            <div>
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Stato</label>
+            <div className="space-y-1.5">
+              <Label>Stato</Label>
               <select
-                className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none appearance-none"
+                className="flex h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-foreground backdrop-blur-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all duration-200 appearance-none"
                 value={stato}
                 onChange={e => setStato(e.target.value as Quote['stato'])}
               >
@@ -331,64 +337,61 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
 
           {/* Templates */}
           <div>
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-2">Template Predefiniti</label>
+            <Label className="block mb-2">Template Predefiniti</Label>
             <div className="flex flex-wrap gap-2">
               {Object.entries(QUOTE_TEMPLATES).map(([key, tmpl]) => {
                 const Icon = tmpl.icon;
                 return (
-                  <button
+                  <Button
                     key={key}
+                    variant={tipo === key ? 'default' : 'outline'}
+                    size="sm"
                     onClick={() => loadTemplate(key)}
-                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${tipo === key
-                      ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                      : 'border-white/10 text-zinc-500 hover:text-white hover:border-white/20'
-                      }`}
+                    className="gap-1.5"
                   >
                     <Icon size={12} />
                     {tmpl.label}
-                  </button>
+                  </Button>
                 );
               })}
-              <button
+              <Button
+                variant={tipo === 'custom' ? 'default' : 'outline'}
+                size="sm"
                 onClick={() => { setTipo('custom'); setItems([]); }}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${tipo === 'custom'
-                  ? 'border-blue-500 bg-blue-500/10 text-blue-400'
-                  : 'border-white/10 text-zinc-500 hover:text-white hover:border-white/20'
-                  }`}
+                className="gap-1.5"
               >
                 <Settings size={12} />
                 Personalizzato
-              </button>
+              </Button>
             </div>
           </div>
+
+          <Separator />
 
           {/* Items Table */}
           <div>
             <div className="flex justify-between items-center mb-3">
-              <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Voci del Preventivo</label>
-              <button
-                onClick={addItem}
-                className="flex items-center gap-1 text-[10px] font-black text-blue-400 hover:text-blue-300 uppercase tracking-widest transition-all"
-              >
+              <Label>Voci del Preventivo</Label>
+              <Button variant="ghost" size="sm" onClick={addItem} className="text-primary gap-1">
                 <Plus size={12} /> Aggiungi Voce
-              </button>
+              </Button>
             </div>
 
             <div className="space-y-2">
               {/* Header */}
               <div className="grid grid-cols-12 gap-2 px-3 py-1">
-                <div className="col-span-5 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Descrizione</div>
-                <div className="col-span-4 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Link Social</div>
-                <div className="col-span-2 text-[9px] font-black text-zinc-600 uppercase tracking-widest text-right">Qtà</div>
+                <div className="col-span-5 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Descrizione</div>
+                <div className="col-span-4 text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Link Social</div>
+                <div className="col-span-2 text-[9px] font-bold text-muted-foreground uppercase tracking-widest text-right">Qtà</div>
                 <div className="col-span-1" />
               </div>
 
               {items.map((item, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-zinc-900/30 rounded-xl px-3 py-2 border border-white/5">
+                <GlassCard key={idx} className="grid grid-cols-12 gap-2 items-center px-3 py-2">
                   <div className="col-span-5">
                     <input
                       type="text"
-                      className="w-full bg-transparent text-sm text-white font-bold focus:outline-none placeholder-zinc-600"
+                      className="w-full bg-transparent text-sm text-foreground font-medium focus:outline-none placeholder-muted-foreground"
                       placeholder="Descrizione voce..."
                       value={item.descrizione}
                       onChange={e => updateItem(idx, 'descrizione', e.target.value)}
@@ -397,7 +400,7 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                   <div className="col-span-4">
                     <input
                       type="text"
-                      className="w-full bg-transparent text-sm text-white font-bold focus:outline-none placeholder-zinc-600"
+                      className="w-full bg-transparent text-sm text-foreground font-medium focus:outline-none placeholder-muted-foreground"
                       placeholder="https://..."
                       value={item.link_social}
                       onChange={e => updateItem(idx, 'link_social', e.target.value)}
@@ -406,21 +409,21 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
                   <div className="col-span-2">
                     <input
                       type="number" min={1}
-                      className="w-full bg-transparent text-sm text-white font-bold focus:outline-none text-right"
+                      className="w-full bg-transparent text-sm text-foreground font-medium focus:outline-none text-right"
                       value={item.quantita}
                       onChange={e => updateItem(idx, 'quantita', Number(e.target.value))}
                     />
                   </div>
                   <div className="col-span-1 text-right">
-                    <button onClick={() => removeItem(idx)} className="p-1 text-zinc-600 hover:text-red-400 transition-all">
+                    <Button variant="ghost" size="icon" onClick={() => removeItem(idx)} className="h-7 w-7 text-muted-foreground hover:text-destructive">
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </div>
-                </div>
+                </GlassCard>
               ))}
 
               {items.length === 0 && (
-                <div className="text-center py-6 text-zinc-600 text-xs">
+                <div className="text-center py-6 text-muted-foreground text-xs">
                   Nessuna voce. Seleziona un template o aggiungi voci personalizzate.
                 </div>
               )}
@@ -428,27 +431,26 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
           </div>
 
           {/* Totals */}
-          <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-5">
+          <GlassCard variant="prominent" className="p-5">
             <div className="flex justify-between items-center">
-              <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Totale</span>
+              <span className="text-xs font-black text-primary uppercase tracking-widest">Totale</span>
               <div className="flex items-center gap-2">
-                <span className="text-zinc-400 text-lg font-black">€</span>
-                <input
+                <span className="text-muted-foreground text-lg font-black">€</span>
+                <Input
                   type="number" min={0}
-                  className="w-40 bg-zinc-800/50 border border-white/10 rounded-xl px-4 py-2 text-2xl text-white font-black focus:border-blue-500/50 focus:outline-none text-right"
+                  className="w-40 text-2xl font-black text-right h-12"
                   value={totaleManuale || ''}
                   onChange={e => setTotaleManuale(Number(e.target.value))}
                 />
               </div>
             </div>
-          </div>
+          </GlassCard>
 
           {/* Note */}
-          <div>
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Note</label>
-            <textarea
+          <div className="space-y-1.5">
+            <Label>Note</Label>
+            <Textarea
               rows={2}
-              className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none resize-none"
               placeholder="Note aggiuntive..."
               value={note}
               onChange={e => setNote(e.target.value)}
@@ -457,20 +459,21 @@ const QuoteEditor: React.FC<QuoteEditorProps> = ({ quote, onClose, onSaved }) =>
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-white/5 flex gap-3 shrink-0">
-          <button
+        <div className="p-6 border-t border-white/[0.06] flex gap-3 shrink-0">
+          <Button
             onClick={handleSave}
             disabled={isSubmitting}
-            className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest py-3.5 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+            className="flex-1"
+            size="lg"
           >
             {isSubmitting ? 'Salvataggio...' : (quote ? 'Salva Modifiche' : 'Crea Preventivo')}
-          </button>
-          <button onClick={onClose} className="px-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-black uppercase text-[10px] tracking-widest py-3.5 rounded-xl transition-all">
+          </Button>
+          <Button variant="outline" size="lg" onClick={onClose}>
             Annulla
-          </button>
+          </Button>
         </div>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -493,54 +496,44 @@ const QuotesList: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   };
 
-  const getStatoColor = (stato: string) => {
+  const getStatoBadgeVariant = (stato: string): "glass" | "default" | "success" | "destructive" | "warning" => {
     switch (stato) {
-      case 'bozza': return 'bg-zinc-700/50 text-zinc-300';
-      case 'inviato': return 'bg-blue-500/20 text-blue-400';
-      case 'accettato': return 'bg-emerald-500/20 text-emerald-400';
-      case 'rifiutato': return 'bg-red-500/20 text-red-400';
-      default: return 'bg-zinc-700/50 text-zinc-300';
+      case 'bozza': return 'glass';
+      case 'inviato': return 'default';
+      case 'accettato': return 'success';
+      case 'rifiutato': return 'destructive';
+      default: return 'glass';
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-lg" />
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-        className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-3xl shadow-3xl overflow-hidden max-h-[85vh] flex flex-col"
-      >
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0">
         {/* Header */}
-        <div className="p-6 border-b border-white/5 flex justify-between items-center shrink-0">
-          <div>
-            <h3 className="text-xl font-black text-white uppercase tracking-tight">Preventivi</h3>
-            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
+        <div className="p-6 border-b border-white/[0.06] flex justify-between items-center shrink-0">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Preventivi</DialogTitle>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">
               {quotes.length} preventiv{quotes.length === 1 ? 'o' : 'i'} totali
             </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowNewQuote(true)}
-              className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-            >
-              <Plus size={14} /> Nuovo
-            </button>
-            <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-              <X size={18} />
-            </button>
-          </div>
+          </DialogHeader>
+          <Button onClick={() => setShowNewQuote(true)} size="sm" className="gap-1.5">
+            <Plus size={14} /> Nuovo
+          </Button>
         </div>
 
         {/* Filters */}
         <div className="px-6 pt-4 flex items-center gap-2">
           {['ALL', 'bozza', 'inviato', 'accettato', 'rifiutato'].map(s => (
-            <button
+            <Button
               key={s}
+              variant={filterStato === s ? 'default' : 'ghost'}
+              size="sm"
               onClick={() => setFilterStato(s)}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${filterStato === s ? 'bg-blue-600 text-white' : 'text-zinc-500 hover:text-white bg-zinc-900/50'}`}
+              className="text-[9px] font-bold uppercase tracking-widest"
             >
               {s === 'ALL' ? 'Tutti' : s.charAt(0).toUpperCase() + s.slice(1)}
-            </button>
+            </Button>
           ))}
         </div>
 
@@ -549,26 +542,28 @@ const QuotesList: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           {filteredQuotes.map(q => {
             const client = q.client_id ? clients.find(c => c.id === q.client_id) : null;
             return (
-              <div
+              <GlassCard
                 key={q.id}
-                className="bg-zinc-900/30 border border-white/5 rounded-xl p-4 hover:border-white/10 transition-all cursor-pointer group"
+                variant="interactive"
+                hover
+                className="p-4 group"
                 onClick={() => setEditingQuote(q)}
               >
                 <div className="flex items-center justify-between">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${getStatoColor(q.stato)}`}>
+                      <Badge variant={getStatoBadgeVariant(q.stato)}>
                         {q.stato}
-                      </span>
-                      <span className="px-2 py-0.5 rounded bg-zinc-800 text-[8px] font-black text-zinc-400 uppercase tracking-widest">
+                      </Badge>
+                      <Badge variant="outline">
                         {q.tipo}
-                      </span>
+                      </Badge>
                     </div>
-                    <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors truncate">{q.titolo}</p>
+                    <p className="text-sm font-black text-foreground group-hover:text-primary transition-colors truncate">{q.titolo}</p>
                     <div className="flex items-center gap-3 mt-1">
-                      {client && <span className="text-[10px] text-zinc-500 font-bold">{client.ragione_sociale}</span>}
+                      {client && <span className="text-[10px] text-muted-foreground font-bold">{client.ragione_sociale}</span>}
                       {q.createdAt && (
-                        <span className="text-[10px] text-zinc-600 font-bold">
+                        <span className="text-[10px] text-muted-foreground/60 font-bold">
                           {format(new Date(q.createdAt), 'dd MMM yyyy', { locale: it })}
                         </span>
                       )}
@@ -576,37 +571,37 @@ const QuotesList: React.FC<{ onClose: () => void }> = ({ onClose }) => {
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <p className="text-lg font-black text-white">€{q.totale.toLocaleString()}</p>
-                      <p className="text-[10px] text-zinc-600 font-bold">{q.items.length} voci</p>
+                      <p className="text-lg font-black text-foreground">{'\u20AC'}{q.totale.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">{q.items.length} voci</p>
                     </div>
-                    <button
+                    <Button
+                      variant="ghost"
+                      size="icon"
                       onClick={e => { e.stopPropagation(); handleDelete(q.id); }}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-600 hover:text-red-400 transition-all"
+                      className="opacity-0 group-hover:opacity-100 h-7 w-7 text-muted-foreground hover:text-destructive"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </Button>
                   </div>
                 </div>
-              </div>
+              </GlassCard>
             );
           })}
 
           {filteredQuotes.length === 0 && (
             <div className="text-center py-12">
-              <FileText size={40} className="mx-auto text-zinc-800 mb-3" />
-              <p className="text-xs font-black text-zinc-600 uppercase tracking-widest">Nessun preventivo</p>
-              <p className="text-[10px] text-zinc-700 mt-2">Crea il tuo primo preventivo</p>
+              <FileText size={40} className="mx-auto text-muted-foreground/30 mb-3" />
+              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Nessun preventivo</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-2">Crea il tuo primo preventivo</p>
             </div>
           )}
         </div>
 
         {/* Sub-modals */}
-        <AnimatePresence>
-          {showNewQuote && <QuoteEditor onClose={() => setShowNewQuote(false)} />}
-          {editingQuote && <QuoteEditor quote={editingQuote} onClose={() => setEditingQuote(null)} />}
-        </AnimatePresence>
-      </motion.div>
-    </div>
+        {showNewQuote && <QuoteEditor onClose={() => setShowNewQuote(false)} />}
+        {editingQuote && <QuoteEditor quote={editingQuote} onClose={() => setEditingQuote(null)} />}
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -734,280 +729,392 @@ const Finance: React.FC<FinanceProps> = ({ campaigns, collaborations, extraCosts
     setNewIncome({ campaignId: '', amount: 0, date: format(new Date(), 'yyyy-MM-dd'), expectedDate: '', notes: '' });
   };
 
+  // ==================== TALENT VIEW ====================
+
   if (role === 'talent' && talentFinance) {
     return (
-      <div className="space-y-8">
-        <header>
-          <h1 className="text-4xl font-black text-white tracking-tighter uppercase">I Miei Guadagni</h1>
-          <p className="text-zinc-500 font-medium text-lg">Riepilogo finanziario e stato pagamenti.</p>
-        </header>
+      <AnimatedContainer className="space-y-8">
+        <PageHeader
+          title="I Miei Guadagni"
+          subtitle="Riepilogo finanziario e stato pagamenti"
+        />
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-zinc-900/30 rounded-2xl p-6 border border-white/5">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Totale Maturato</p>
-            <p className="text-4xl font-black text-white">€{talentFinance.totalEarned.toLocaleString()}</p>
-          </div>
-          <div className="bg-zinc-900/30 rounded-2xl p-6 border border-white/5">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Incassato</p>
-            <p className="text-4xl font-black text-emerald-500">€{talentFinance.paid.toLocaleString()}</p>
-          </div>
-          <div className="bg-zinc-900/30 rounded-2xl p-6 border border-white/5">
-            <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">In Attesa</p>
-            <p className="text-4xl font-black text-amber-500">€{talentFinance.pending.toLocaleString()}</p>
-          </div>
-        </div>
+        <motion.div
+          variants={staggerContainer}
+          initial="hidden"
+          animate="show"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+        >
+          <motion.div variants={staggerItem}>
+            <StatCard
+              label="Totale Maturato"
+              value={`\u20AC${talentFinance.totalEarned.toLocaleString()}`}
+              icon={Wallet}
+              color="white"
+            />
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <StatCard
+              label="Incassato"
+              value={`\u20AC${talentFinance.paid.toLocaleString()}`}
+              icon={ArrowUpRight}
+              color="emerald"
+            />
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <StatCard
+              label="In Attesa"
+              value={`\u20AC${talentFinance.pending.toLocaleString()}`}
+              icon={TrendingUp}
+              color="amber"
+            />
+          </motion.div>
+        </motion.div>
 
-        <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-white/5">
-            <h3 className="text-sm font-black text-white uppercase tracking-widest">Storico Pagamenti</h3>
+        <GlassCard variant="prominent" className="overflow-hidden">
+          <div className="px-6 py-4 border-b border-white/[0.06]">
+            <h3 className="text-sm font-black text-foreground uppercase tracking-widest">Storico Pagamenti</h3>
           </div>
-          <div className="divide-y divide-white/5">
+          <div className="divide-y divide-white/[0.06]">
             {talentFinance.myCollabs.map(col => {
               const campaign = campaigns.find(c => c.id === col.campaignId);
               return (
-                <div key={col.id} className="p-5 flex items-center justify-between hover:bg-zinc-900/20 transition-all">
+                <div key={col.id} className="p-5 flex items-center justify-between hover:bg-white/[0.03] transition-all">
                   <div>
-                    <h4 className="text-sm font-black text-white">{col.brand}</h4>
-                    <p className="text-[10px] font-bold text-zinc-500">{campaign?.name} • {col.type}</p>
+                    <h4 className="text-sm font-black text-foreground">{col.brand}</h4>
+                    <p className="text-[10px] font-bold text-muted-foreground">{campaign?.name} - {col.type}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-black text-white">€{col.fee.toLocaleString()}</p>
-                    <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${col.paymentStatus === 'Saldato' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
-                      }`}>
+                    <p className="text-sm font-black text-foreground">{'\u20AC'}{col.fee.toLocaleString()}</p>
+                    <Badge
+                      variant={col.paymentStatus === 'Saldato' ? 'success' : 'warning'}
+                      className="mt-1"
+                    >
                       {col.paymentStatus}
-                    </span>
+                    </Badge>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      </div>
+        </GlassCard>
+      </AnimatedContainer>
     );
   }
 
-  // Admin View
+  // ==================== ADMIN VIEW ====================
+
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase">Finanze</h1>
-          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-            Analisi profittabilità e flussi di cassa
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button
-            onClick={() => setShowQuotesList(true)}
-            className="flex items-center gap-2 bg-zinc-900 border border-white/10 hover:border-blue-500/50 hover:bg-zinc-800 text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
-          >
-            <Calculator size={14} className="text-blue-500" />
-            Preventivatore
-          </button>
-          <button
-            onClick={() => setShowIncomeModal(true)}
-            className="flex items-center gap-2 bg-zinc-900 border border-white/10 hover:border-emerald-500/50 hover:bg-zinc-800 text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
-          >
-            <Plus size={14} className="text-emerald-500" />
-            Reg. Incasso
-          </button>
-          <button
-            onClick={() => setShowCostModal(true)}
-            className="flex items-center gap-2 bg-zinc-900 border border-white/10 hover:border-red-500/50 hover:bg-zinc-800 text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all"
-          >
-            <Plus size={14} className="text-red-500" />
-            Reg. Costo
-          </button>
-        </div>
-      </header>
+    <AnimatedContainer className="space-y-8 pb-20">
+      <PageHeader
+        title="Finanze"
+        subtitle="Analisi profittabilità e flussi di cassa"
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setShowQuotesList(true)} className="gap-2">
+              <Calculator size={14} className="text-primary" />
+              Preventivatore
+            </Button>
+            <Button variant="glass" onClick={() => setShowIncomeModal(true)} className="gap-2">
+              <Plus size={14} className="text-emerald-400" />
+              Reg. Incasso
+            </Button>
+            <Button variant="glass" onClick={() => setShowCostModal(true)} className="gap-2">
+              <Plus size={14} className="text-red-400" />
+              Reg. Costo
+            </Button>
+          </>
+        }
+      />
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Fatturato</p>
-          <p className="text-2xl font-black text-white">€{analytics.totalRevenue.toLocaleString()}</p>
-          <p className="text-[10px] text-emerald-500 font-bold mt-1">€{analytics.cashIn.toLocaleString()} incassati</p>
-        </div>
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Payout Talent</p>
-          <p className="text-2xl font-black text-blue-400">€{analytics.totalTalentPayouts.toLocaleString()}</p>
-          <p className="text-[10px] text-zinc-600 font-bold mt-1">{analytics.totalRevenue > 0 ? ((analytics.totalTalentPayouts / analytics.totalRevenue) * 100).toFixed(0) : 0}% del fatturato</p>
-        </div>
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-white/5">
-          <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Costi Extra</p>
-          <p className="text-2xl font-black text-red-400">€{analytics.totalExtraCosts.toLocaleString()}</p>
-          <p className="text-[10px] text-zinc-600 font-bold mt-1">Produzione, logistica, ads</p>
-        </div>
-        <div className="bg-zinc-900/30 rounded-2xl p-5 border border-emerald-500/20">
-          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Utile Netto</p>
-          <p className="text-2xl font-black text-white">€{analytics.grossProfit.toLocaleString()}</p>
-          <div className="mt-2 flex items-center gap-2">
-            <div className="flex-1 h-1 bg-zinc-800 rounded-full overflow-hidden">
-              <div className="h-full bg-emerald-500" style={{ width: `${Math.min(analytics.margin, 100)}%` }} />
+      <motion.div
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 md:grid-cols-4 gap-4"
+      >
+        <motion.div variants={staggerItem}>
+          <StatCard
+            label="Fatturato"
+            value={`\u20AC${analytics.totalRevenue.toLocaleString()}`}
+            icon={Wallet}
+            color="white"
+            trend={{ value: 0, label: `\u20AC${analytics.cashIn.toLocaleString()} incassati` }}
+          />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <StatCard
+            label="Payout Talent"
+            value={`\u20AC${analytics.totalTalentPayouts.toLocaleString()}`}
+            icon={Users}
+            color="blue"
+            trend={{ value: 0, label: `${analytics.totalRevenue > 0 ? ((analytics.totalTalentPayouts / analytics.totalRevenue) * 100).toFixed(0) : 0}% del fatturato` }}
+          />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <StatCard
+            label="Costi Extra"
+            value={`\u20AC${analytics.totalExtraCosts.toLocaleString()}`}
+            icon={ArrowDownRight}
+            color="red"
+            trend={{ value: 0, label: "Produzione, logistica, ads" }}
+          />
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <GlassCard hover className="p-5 border-emerald-500/20">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-emerald-400 mb-2">
+                  Utile Netto
+                </p>
+                <p className="text-2xl font-black tracking-tight text-foreground">
+                  {'\u20AC'}{analytics.grossProfit.toLocaleString()}
+                </p>
+              </div>
+              <div className="p-2.5 rounded-xl bg-emerald-500/10">
+                <TrendingUp size={18} className="text-emerald-400" />
+              </div>
             </div>
-            <span className="text-[10px] font-black text-emerald-500">{analytics.margin.toFixed(1)}%</span>
-          </div>
-        </div>
-      </div>
+            <div className="mt-3 flex items-center gap-2">
+              <div className="flex-1 h-1 bg-white/[0.06] rounded-full overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.min(analytics.margin, 100)}%` }} />
+              </div>
+              <span className="text-[10px] font-black text-emerald-400">{analytics.margin.toFixed(1)}%</span>
+            </div>
+          </GlassCard>
+        </motion.div>
+      </motion.div>
 
       {/* Filter Bar */}
-      <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 bg-zinc-900/40 p-2 rounded-xl border border-white/5 sm:w-fit">
-        <div className="flex items-center px-3 py-1.5 border-r border-white/5">
-          <Filter size={14} className="text-zinc-500 mr-2" />
-          <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Filtra</span>
+      <GlassCard className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-3 p-2 sm:w-fit">
+        <div className="flex items-center px-3 py-1.5 border-r border-white/[0.06]">
+          <Filter size={14} className="text-muted-foreground mr-2" />
+          <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Filtra</span>
         </div>
         <select
           value={selectedCampaignId}
           onChange={(e) => setSelectedCampaignId(e.target.value)}
-          className="bg-transparent border-none text-xs font-bold text-white focus:ring-0 cursor-pointer outline-none min-w-[180px]"
+          className="bg-transparent border-none text-xs font-semibold text-foreground focus:ring-0 cursor-pointer outline-none min-w-[180px]"
         >
           <option value="ALL" className="bg-zinc-900">Tutte le Campagne</option>
           {campaigns.map(c => <option key={c.id} value={c.id} className="bg-zinc-900">{c.name}</option>)}
         </select>
-        <div className="flex items-center gap-2 pl-3 border-l border-white/5">
-          <Calendar size={14} className="text-zinc-500" />
-          <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent border-none text-xs font-bold text-white focus:ring-0 w-[110px]" />
-          <span className="text-zinc-600">-</span>
-          <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent border-none text-xs font-bold text-white focus:ring-0 w-[110px]" />
+        <div className="flex items-center gap-2 pl-3 border-l border-white/[0.06]">
+          <Calendar size={14} className="text-muted-foreground" />
+          <input type="date" value={dateRange.start} onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))} className="bg-transparent border-none text-xs font-semibold text-foreground focus:ring-0 w-[110px]" />
+          <span className="text-muted-foreground">-</span>
+          <input type="date" value={dateRange.end} onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))} className="bg-transparent border-none text-xs font-semibold text-foreground focus:ring-0 w-[110px]" />
         </div>
-      </div>
+      </GlassCard>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Entrate */}
-        <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-white/5 flex justify-between items-center">
-            <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
-              <ArrowUpRight size={16} className="text-emerald-500" /> Flusso Entrate
+        <GlassCard variant="prominent" className="overflow-hidden">
+          <div className="p-5 border-b border-white/[0.06] flex justify-between items-center">
+            <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
+              <ArrowUpRight size={16} className="text-emerald-400" /> Flusso Entrate
             </h3>
           </div>
           <div className="max-h-[350px] overflow-y-auto">
             {analytics.filteredIncome.length > 0 ? analytics.filteredIncome.map(inc => {
               const camp = campaigns.find(c => c.id === inc.campaignId);
               return (
-                <div key={inc.id} className="p-4 border-b border-white/5 hover:bg-zinc-900/30 transition-all flex items-center justify-between group">
+                <div key={inc.id} className="p-4 border-b border-white/[0.04] hover:bg-white/[0.03] transition-all flex items-center justify-between group">
                   <div>
-                    <p className="text-xs font-black text-white">{camp?.name}</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">{format(new Date(inc.date), 'dd MMM yyyy', { locale: it })} • {inc.note || 'Nessuna nota'}</p>
+                    <p className="text-xs font-black text-foreground">{camp?.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{format(new Date(inc.date), 'dd MMM yyyy', { locale: it })} - {inc.note || 'Nessuna nota'}</p>
                   </div>
                   <div className="text-right flex items-center gap-2">
                     <div>
-                      <p className="text-sm font-black text-white">€{inc.amount.toLocaleString()}</p>
-                      <span className={`text-[9px] font-black uppercase ${inc.status === 'received' ? 'text-emerald-500' : 'text-amber-500'}`}>
+                      <p className="text-sm font-black text-foreground">{'\u20AC'}{inc.amount.toLocaleString()}</p>
+                      <Badge variant={inc.status === 'received' ? 'success' : 'warning'} className="text-[9px]">
                         {inc.status === 'received' ? 'Incassato' : 'In Attesa'}
-                      </span>
+                      </Badge>
                     </div>
-                    <button onClick={() => deleteIncome(inc.id)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all text-zinc-600"><X size={12} /></button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteIncome(inc.id)}
+                      className="opacity-0 group-hover:opacity-100 h-6 w-6 text-muted-foreground hover:text-destructive"
+                    >
+                      <X size={12} />
+                    </Button>
                   </div>
                 </div>
               );
             }) : (
-              <div className="p-8 text-center text-zinc-600 text-xs font-bold uppercase tracking-widest">Nessun movimento</div>
+              <div className="p-8 text-center text-muted-foreground text-xs font-bold uppercase tracking-widest">Nessun movimento</div>
             )}
           </div>
-        </div>
+        </GlassCard>
 
         {/* Uscite */}
-        <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden">
-          <div className="p-5 border-b border-white/5 flex justify-between items-center">
-            <h3 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2">
-              <ArrowDownRight size={16} className="text-red-500" /> Costi Extra
+        <GlassCard variant="prominent" className="overflow-hidden">
+          <div className="p-5 border-b border-white/[0.06] flex justify-between items-center">
+            <h3 className="text-sm font-black text-foreground uppercase tracking-widest flex items-center gap-2">
+              <ArrowDownRight size={16} className="text-red-400" /> Costi Extra
             </h3>
           </div>
           <div className="max-h-[350px] overflow-y-auto">
             {analytics.filteredCosts.length > 0 ? analytics.filteredCosts.map(cost => {
               const camp = campaigns.find(c => c.id === cost.campaignId);
               return (
-                <div key={cost.id} className="p-4 border-b border-white/5 hover:bg-zinc-900/30 transition-all flex items-center justify-between group">
+                <div key={cost.id} className="p-4 border-b border-white/[0.04] hover:bg-white/[0.03] transition-all flex items-center justify-between group">
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.5 rounded bg-zinc-800 text-[8px] font-black text-zinc-400 uppercase">{cost.category}</span>
-                      <span className="text-xs font-black text-white">{camp?.name}</span>
+                      <Badge variant="glass">{cost.category}</Badge>
+                      <span className="text-xs font-black text-foreground">{camp?.name}</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">{cost.provider} • {format(new Date(cost.date), 'dd MMM', { locale: it })}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">{cost.provider} - {format(new Date(cost.date), 'dd MMM', { locale: it })}</p>
                   </div>
                   <div className="text-right flex items-center gap-2">
                     <div>
-                      <p className="text-sm font-black text-white">€{cost.amount.toLocaleString()}</p>
-                      <span className={`text-[9px] font-black uppercase ${cost.status === 'paid' ? 'text-blue-500' : 'text-zinc-500'}`}>
+                      <p className="text-sm font-black text-foreground">{'\u20AC'}{cost.amount.toLocaleString()}</p>
+                      <Badge variant={cost.status === 'paid' ? 'default' : 'glass'} className="text-[9px]">
                         {cost.status === 'paid' ? 'Pagato' : 'Da Pagare'}
-                      </span>
+                      </Badge>
                     </div>
-                    <button onClick={() => deleteExtraCost(cost.id)} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-500 transition-all text-zinc-600"><X size={12} /></button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => deleteExtraCost(cost.id)}
+                      className="opacity-0 group-hover:opacity-100 h-6 w-6 text-muted-foreground hover:text-destructive"
+                    >
+                      <X size={12} />
+                    </Button>
                   </div>
                 </div>
               );
             }) : (
-              <div className="p-8 text-center text-zinc-600 text-xs font-bold uppercase tracking-widest">Nessun costo extra</div>
+              <div className="p-8 text-center text-muted-foreground text-xs font-bold uppercase tracking-widest">Nessun costo extra</div>
             )}
           </div>
-        </div>
+        </GlassCard>
       </div>
 
       {/* Quotes List Modal */}
-      <AnimatePresence>
-        {showQuotesList && <QuotesList onClose={() => setShowQuotesList(false)} />}
-      </AnimatePresence>
+      {showQuotesList && <QuotesList onClose={() => setShowQuotesList(false)} />}
 
       {/* Add Cost Modal */}
-      <AnimatePresence>
-        {showCostModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowCostModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-lg" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-lg shadow-3xl overflow-hidden p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Nuovo Costo</h3>
-                <button onClick={() => setShowCostModal(false)} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white"><X size={18} /></button>
-              </div>
-              <form onSubmit={handleAddCost} className="space-y-4">
-                <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newCost.campaignId} onChange={e => setNewCost({ ...newCost, campaignId: e.target.value })}>
-                  <option value="">Seleziona Campagna...</option>
-                  {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+      <Dialog open={showCostModal} onOpenChange={setShowCostModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Nuovo Costo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddCost} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Campagna</Label>
+              <select
+                className="flex h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-foreground backdrop-blur-sm focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all duration-200 appearance-none"
+                value={newCost.campaignId}
+                onChange={e => setNewCost({ ...newCost, campaignId: e.target.value })}
+              >
+                <option value="">Seleziona Campagna...</option>
+                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label>Categoria</Label>
+                <select
+                  className="flex h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-foreground backdrop-blur-sm focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all duration-200 appearance-none"
+                  value={newCost.category}
+                  onChange={e => setNewCost({ ...newCost, category: e.target.value })}
+                >
+                  <option value="videomaker">Videomaker</option>
+                  <option value="luci">Luci & Service</option>
+                  <option value="van">Trasporti / Van</option>
+                  <option value="ads">Advertising</option>
+                  <option value="location">Location</option>
+                  <option value="altro">Altro</option>
                 </select>
-                <div className="grid grid-cols-2 gap-4">
-                  <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newCost.category} onChange={e => setNewCost({ ...newCost, category: e.target.value })}>
-                    <option value="videomaker">Videomaker</option>
-                    <option value="luci">Luci & Service</option>
-                    <option value="van">Trasporti / Van</option>
-                    <option value="ads">Advertising</option>
-                    <option value="location">Location</option>
-                    <option value="altro">Altro</option>
-                  </select>
-                  <input type="number" placeholder="Importo €" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newCost.amount || ''} onChange={e => setNewCost({ ...newCost, amount: Number(e.target.value) })} />
-                </div>
-                <input type="text" placeholder="Fornitore (opzionale)" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newCost.provider} onChange={e => setNewCost({ ...newCost, provider: e.target.value })} />
-                <input type="date" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newCost.date} onChange={e => setNewCost({ ...newCost, date: e.target.value })} />
-                <button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-lg shadow-red-500/20 mt-2">Registra Costo</button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              </div>
+              <div className="space-y-1.5">
+                <Label>Importo</Label>
+                <Input
+                  type="number"
+                  placeholder="Importo €"
+                  value={newCost.amount || ''}
+                  onChange={e => setNewCost({ ...newCost, amount: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Fornitore</Label>
+              <Input
+                type="text"
+                placeholder="Fornitore (opzionale)"
+                value={newCost.provider}
+                onChange={e => setNewCost({ ...newCost, provider: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data</Label>
+              <Input
+                type="date"
+                value={newCost.date}
+                onChange={e => setNewCost({ ...newCost, date: e.target.value })}
+              />
+            </div>
+            <Button type="submit" variant="destructive" size="lg" className="w-full mt-2">
+              Registra Costo
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Income Modal */}
-      <AnimatePresence>
-        {showIncomeModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowIncomeModal(false)} className="absolute inset-0 bg-black/80 backdrop-blur-lg" />
-            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }} className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-lg shadow-3xl overflow-hidden p-8">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-black text-white uppercase tracking-tight">Nuovo Incasso</h3>
-                <button onClick={() => setShowIncomeModal(false)} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white"><X size={18} /></button>
-              </div>
-              <form onSubmit={handleAddIncome} className="space-y-4">
-                <select className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newIncome.campaignId} onChange={e => setNewIncome({ ...newIncome, campaignId: e.target.value })}>
-                  <option value="">Seleziona Campagna...</option>
-                  {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <input type="number" placeholder="Importo €" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newIncome.amount || ''} onChange={e => setNewIncome({ ...newIncome, amount: Number(e.target.value) })} />
-                <input type="date" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newIncome.date} onChange={e => setNewIncome({ ...newIncome, date: e.target.value })} />
-                <input type="text" placeholder="Note (Fattura N., Bonifico...)" className="w-full bg-zinc-900 border border-white/5 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none" value={newIncome.notes} onChange={e => setNewIncome({ ...newIncome, notes: e.target.value })} />
-                <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-lg shadow-emerald-500/20 mt-2">Registra Incasso</button>
-              </form>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+      <Dialog open={showIncomeModal} onOpenChange={setShowIncomeModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Nuovo Incasso</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddIncome} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Campagna</Label>
+              <select
+                className="flex h-10 w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 py-2 text-sm text-foreground backdrop-blur-sm focus-visible:outline-none focus-visible:border-primary/50 focus-visible:ring-2 focus-visible:ring-primary/20 transition-all duration-200 appearance-none"
+                value={newIncome.campaignId}
+                onChange={e => setNewIncome({ ...newIncome, campaignId: e.target.value })}
+              >
+                <option value="">Seleziona Campagna...</option>
+                {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Importo</Label>
+              <Input
+                type="number"
+                placeholder="Importo €"
+                value={newIncome.amount || ''}
+                onChange={e => setNewIncome({ ...newIncome, amount: Number(e.target.value) })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Data</Label>
+              <Input
+                type="date"
+                value={newIncome.date}
+                onChange={e => setNewIncome({ ...newIncome, date: e.target.value })}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Note</Label>
+              <Input
+                type="text"
+                placeholder="Note (Fattura N., Bonifico...)"
+                value={newIncome.notes}
+                onChange={e => setNewIncome({ ...newIncome, notes: e.target.value })}
+              />
+            </div>
+            <Button type="submit" size="lg" className="w-full mt-2">
+              Registra Incasso
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </AnimatedContainer>
   );
 };
 

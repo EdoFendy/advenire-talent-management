@@ -6,6 +6,16 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useApp } from '../context/AppContext';
 import { talentsApi } from '../api';
 import * as XLSX from 'xlsx';
+import { GlassCard } from '@/components/ui/glass-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { PageHeader } from '@/components/ui/page-header';
+import { AnimatedContainer } from '@/components/ui/animated-container';
+import { SearchInput } from '@/components/ui/search-input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 
 // ============== FIXED COLUMN DEFINITIONS (formato unico, non personalizzabile) ==============
 const TEMPLATE_COLUMNS = [
@@ -79,10 +89,10 @@ function extractFromBillingData(text: string) {
   else if (result.paypal_email) result.payout_method = 'PayPal';
 
   // Extract billing name from "(Name Surname)" pattern or "Name; IBAN:" pattern
-  const parenName = text.match(/\(([A-Za-zÀ-ú\s]{3,40})\)/);
+  const parenName = text.match(/\(([A-Za-z\u00C0-\u00FA\s]{3,40})\)/);
   if (parenName) result.billing_name = parenName[1].trim();
   if (!result.billing_name) {
-    const nameFirst = text.match(/^([A-Za-zÀ-ú\s]{3,40})\s*[;:]/);
+    const nameFirst = text.match(/^([A-Za-z\u00C0-\u00FA\s]{3,40})\s*[;:]/);
     if (nameFirst) result.billing_name = nameFirst[1].trim();
   }
 
@@ -117,8 +127,8 @@ interface ValidationError {
 
 function validateRow(row: Record<string, string>, rowIndex: number): ValidationError[] {
   const errors: ValidationError[] = [];
-  if (!row.firstName?.trim()) errors.push({ row: rowIndex + 1, field: 'Nome', message: 'Nome è obbligatorio' });
-  if (!row.lastName?.trim()) errors.push({ row: rowIndex + 1, field: 'Cognome', message: 'Cognome è obbligatorio' });
+  if (!row.firstName?.trim()) errors.push({ row: rowIndex + 1, field: 'Nome', message: 'Nome \u00e8 obbligatorio' });
+  if (!row.lastName?.trim()) errors.push({ row: rowIndex + 1, field: 'Cognome', message: 'Cognome \u00e8 obbligatorio' });
   // Email validation only if provided
   if (row.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(row.email.trim())) {
     errors.push({ row: rowIndex + 1, field: 'Email', message: 'Formato email non valido (non blocca importazione)' });
@@ -139,7 +149,7 @@ function autoMapColumns(headers: string[]): Record<string, string> {
     phone: ['telefono', 'phone', 'tel', 'cellulare', 'mobile'],
     email: ['email', 'e-mail', 'mail', 'posta'],
     address_street: ['via', 'indirizzo', 'street', 'address', 'via e numero', 'indirizzo spedizione'],
-    address_city: ['città', 'citta', 'city'],
+    address_city: ['citt\u00e0', 'citta', 'city'],
     address_zip: ['cap', 'zip', 'postal code', 'codice postale'],
     address_country: ['paese', 'country', 'nazione'],
     notes: ['note', 'notes', 'commenti'],
@@ -158,7 +168,7 @@ function autoMapColumns(headers: string[]): Record<string, string> {
     fiscal_code: ['codice fiscale', 'fiscal code', 'cf'],
     billing_name: ['intestatario', 'nome intestatario', 'billing name'],
     billing_address_street: ['via fatturazione', 'billing street', 'indirizzo fatturazione'],
-    billing_address_city: ['città fatturazione', 'citta fatturazione', 'billing city'],
+    billing_address_city: ['citt\u00e0 fatturazione', 'citta fatturazione', 'billing city'],
     billing_address_zip: ['cap fatturazione', 'billing zip'],
     billing_address_country: ['paese fatturazione', 'billing country'],
     _billing_data: ['dati fatturazione', 'billing data', 'dati pagamento', 'payment data'],
@@ -365,24 +375,24 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose} className="absolute inset-0 bg-black/80 backdrop-blur-lg"
+        onClick={onClose} className="absolute inset-0 bg-black/60 backdrop-blur-2xl"
       />
       <motion.div
         initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-        className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-3xl overflow-hidden flex flex-col"
+        className="relative bg-white/[0.03] backdrop-blur-xl border border-white/[0.1] rounded-3xl w-full max-w-4xl max-h-[90vh] shadow-3xl overflow-hidden flex flex-col"
       >
         {/* Header */}
-        <div className="p-6 border-b border-white/5 flex items-center justify-between flex-shrink-0">
+        <div className="p-6 border-b border-white/[0.08] flex items-center justify-between flex-shrink-0">
           <div>
-            <h3 className="text-lg font-black text-white uppercase tracking-tight">Importa Talenti</h3>
-            <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mt-1">
-              {step === 1 ? 'Step 1 di 4 — Carica File' :
-               step === 3 ? 'Step 2 di 4 — Anteprima' :
-               step === 4 ? 'Step 3 di 4 — Validazione' :
-               'Step 4 di 4 — Risultato'}
+            <h3 className="text-lg font-bold text-white uppercase tracking-tight">Importa Talenti</h3>
+            <p className="text-muted-foreground text-[11px] font-bold uppercase tracking-widest mt-1">
+              {step === 1 ? 'Step 1 di 4 \u2014 Carica File' :
+               step === 3 ? 'Step 2 di 4 \u2014 Anteprima' :
+               step === 4 ? 'Step 3 di 4 \u2014 Validazione' :
+               'Step 4 di 4 \u2014 Risultato'}
             </p>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
+          <button onClick={onClose} className="p-2 hover:bg-white/[0.06] rounded-xl text-muted-foreground hover:text-white transition-all">
             <X size={18} />
           </button>
         </div>
@@ -391,15 +401,15 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
         <div className="px-6 pt-4 flex items-center gap-2 flex-shrink-0">
           {visibleSteps.map((vs, idx) => (
             <div key={vs.num} className="flex items-center flex-1">
-              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black ${
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${
                 vs.num < step ? 'bg-emerald-500/20 text-emerald-400' :
-                vs.num === step ? 'bg-blue-600 text-white' :
-                'bg-zinc-900 text-zinc-600'
+                vs.num === step ? 'bg-primary text-primary-foreground' :
+                'bg-white/[0.03] text-muted-foreground'
               }`}>
                 {vs.num < step ? <Check size={12} /> : idx + 1}
               </div>
               {idx < visibleSteps.length - 1 && (
-                <div className={`flex-1 h-0.5 mx-1 ${vs.num < step ? 'bg-emerald-500/30' : 'bg-zinc-800'}`} />
+                <div className={`flex-1 h-0.5 mx-1 ${vs.num < step ? 'bg-emerald-500/30' : 'bg-white/[0.06]'}`} />
               )}
             </div>
           ))}
@@ -410,24 +420,33 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
           {/* STEP 1: File Upload */}
           {step === 1 && (
             <div className="text-center py-10 space-y-6">
-              <div className="w-20 h-20 bg-zinc-900 rounded-2xl flex items-center justify-center mx-auto border border-white/5">
-                <Upload size={32} className="text-zinc-500" />
+              <div className="w-20 h-20 bg-white/[0.03] backdrop-blur-xl rounded-2xl flex items-center justify-center mx-auto border border-white/[0.08]">
+                <Upload size={32} className="text-muted-foreground" />
               </div>
               <div>
-                <h4 className="text-sm font-black text-white uppercase tracking-widest mb-2">Carica il file</h4>
-                <p className="text-xs text-zinc-500 max-w-md mx-auto">
+                <h4 className="text-sm font-bold text-white uppercase tracking-widest mb-2">Carica il file</h4>
+                <p className="text-xs text-muted-foreground max-w-md mx-auto">
                   Supportati: <strong className="text-zinc-300">.xlsx, .xls, .csv</strong> — il file deve seguire il <strong className="text-zinc-300">formato fisso del template</strong>. Scarica il template per avere tutte le colonne nell'ordine corretto. I campi vuoti verranno importati come vuoti e saranno sempre modificabili.
                 </p>
               </div>
               <div className="flex items-center justify-center gap-3">
-                <button
+                <Button
+                  variant="outline"
                   onClick={downloadTemplate}
-                  className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-5 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border border-white/5"
+                  className="gap-2 font-bold uppercase text-[10px] tracking-widest"
                 >
                   <Download size={14} /> Scarica Template
-                </button>
-                <label className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all cursor-pointer shadow-lg shadow-blue-500/20">
-                  <FileText size={14} /> Seleziona File
+                </Button>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <Button
+                    variant="default"
+                    className="gap-2 font-bold uppercase text-[10px] tracking-widest pointer-events-none"
+                    asChild
+                  >
+                    <span>
+                      <FileText size={14} /> Seleziona File
+                    </span>
+                  </Button>
                   <input type="file" accept=".xlsx,.xls,.csv" onChange={handleFileUpload} className="hidden" />
                 </label>
               </div>
@@ -442,49 +461,49 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
           {/* STEP 3: Preview */}
           {step === 3 && (
             <div className="space-y-4">
-              <p className="text-xs text-zinc-400">
+              <p className="text-xs text-muted-foreground">
                 Anteprima dei dati: <strong className="text-white">{mappedRows.length}</strong> righe trovate.
                 I campi vuoti verranno importati come vuoti e saranno modificabili dal profilo del talent.
               </p>
-              <div className="overflow-x-auto rounded-xl border border-white/5">
+              <div className="overflow-x-auto rounded-xl border border-white/[0.08]">
                 <table className="w-full text-left">
                   <thead>
-                    <tr className="bg-zinc-900/50 border-b border-white/5">
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">#</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Nome</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Cognome</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Email</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Telefono</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">IBAN</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">PayPal</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">Metodo</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">P.IVA</th>
-                      <th className="p-2 text-[10px] font-black text-zinc-500 uppercase tracking-widest">C.F.</th>
+                    <tr className="bg-white/[0.02] border-b border-white/[0.08]">
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">#</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">Nome</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">Cognome</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">Email</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">Telefono</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">IBAN</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">PayPal</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">Metodo</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">P.IVA</th>
+                      <th className="p-2 text-muted-foreground text-[11px] font-bold uppercase tracking-widest">C.F.</th>
                     </tr>
                   </thead>
                   <tbody>
                     {mappedRows.slice(0, 50).map((row, idx) => (
-                      <tr key={idx} className="border-b border-white/5 hover:bg-zinc-900/30">
-                        <td className="p-2 text-[10px] text-zinc-600 font-bold">{idx + 1}</td>
-                        <td className="p-2 text-xs text-white font-bold">{row.firstName || <span className="text-red-400">—</span>}</td>
-                        <td className="p-2 text-xs text-white font-bold">{row.lastName || <span className="text-red-400">—</span>}</td>
-                        <td className="p-2 text-xs text-zinc-400">{row.email || <span className="text-zinc-700">vuoto</span>}</td>
-                        <td className="p-2 text-xs text-zinc-400">{row.phone || <span className="text-zinc-700">vuoto</span>}</td>
-                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.iban ? row.iban.substring(0, 12) + '...' : <span className="text-zinc-700">vuoto</span>}</td>
-                        <td className="p-2 text-xs text-zinc-400">{row.paypal_email ? 'Si' : <span className="text-zinc-700">vuoto</span>}</td>
+                      <tr key={idx} className="border-b border-white/[0.08] hover:bg-white/[0.02]">
+                        <td className="p-2 text-[10px] text-muted-foreground font-bold">{idx + 1}</td>
+                        <td className="p-2 text-xs text-white font-bold">{row.firstName || <span className="text-red-400">&mdash;</span>}</td>
+                        <td className="p-2 text-xs text-white font-bold">{row.lastName || <span className="text-red-400">&mdash;</span>}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{row.email || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{row.phone || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-muted-foreground font-mono">{row.iban ? row.iban.substring(0, 12) + '...' : <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-muted-foreground">{row.paypal_email ? 'Si' : <span className="text-zinc-700">vuoto</span>}</td>
                         <td className="p-2">
                           {row.payout_method ? (
-                            <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400">{row.payout_method}</span>
+                            <Badge variant="success" className="text-[9px]">{row.payout_method}</Badge>
                           ) : <span className="text-xs text-zinc-700">vuoto</span>}
                         </td>
-                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.vat || <span className="text-zinc-700">vuoto</span>}</td>
-                        <td className="p-2 text-xs text-zinc-400 font-mono">{row.fiscal_code || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-muted-foreground font-mono">{row.vat || <span className="text-zinc-700">vuoto</span>}</td>
+                        <td className="p-2 text-xs text-muted-foreground font-mono">{row.fiscal_code || <span className="text-zinc-700">vuoto</span>}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 {mappedRows.length > 50 && (
-                  <p className="p-3 text-[10px] text-zinc-600 font-bold text-center">
+                  <p className="p-3 text-[10px] text-muted-foreground font-bold text-center">
                     ... e altre {mappedRows.length - 50} righe
                   </p>
                 )}
@@ -500,8 +519,8 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                   <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto">
                     <CheckCircle size={28} className="text-emerald-500" />
                   </div>
-                  <h4 className="text-sm font-black text-white uppercase tracking-widest">Validazione superata</h4>
-                  <p className="text-xs text-zinc-500">
+                  <h4 className="text-sm font-bold text-white uppercase tracking-widest">Validazione superata</h4>
+                  <p className="text-xs text-muted-foreground">
                     Tutte le {mappedRows.length} righe sono valide e pronte per l'importazione.
                   </p>
                 </div>
@@ -514,7 +533,7 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                     </div>
                     <button
                       onClick={downloadErrorReport}
-                      className="flex items-center gap-2 text-zinc-400 hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
+                      className="flex items-center gap-2 text-muted-foreground hover:text-white text-[10px] font-bold uppercase tracking-widest transition-colors"
                     >
                       <Download size={12} /> Scarica report
                     </button>
@@ -531,34 +550,34 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                           ? <XCircle size={12} className="text-red-400 flex-shrink-0" />
                           : <AlertTriangle size={12} className="text-amber-400 flex-shrink-0" />
                         }
-                        <span className="text-[10px] font-bold text-zinc-500">Riga {err.row}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground">Riga {err.row}</span>
                         <span className={`text-[10px] font-bold ${err.field === 'Nome' || err.field === 'Cognome' ? 'text-red-400' : 'text-amber-400'}`}>{err.field}</span>
-                        <span className="text-xs text-zinc-400">{err.message}</span>
+                        <span className="text-xs text-muted-foreground">{err.message}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="bg-zinc-900/50 rounded-xl p-4 border border-white/5">
-                    <p className="text-xs text-zinc-400">
+                  <div className="bg-white/[0.02] rounded-xl p-4 border border-white/[0.08]">
+                    <p className="text-xs text-muted-foreground">
                       <strong className="text-white">Nota:</strong> Solo le righe senza Nome/Cognome saranno saltate.
-                      Tutti gli altri campi mancanti o con formato errato saranno importati comunque (il dato verrà salvato così com'è).
+                      Tutti gli altri campi mancanti o con formato errato saranno importati comunque (il dato verr\u00e0 salvato cos\u00ec com'\u00e8).
                     </p>
                   </div>
                 </>
               )}
 
-              <div className="flex items-center gap-4 bg-zinc-900/30 rounded-xl p-4 border border-white/5">
+              <div className="flex items-center gap-4 bg-white/[0.02] rounded-xl p-4 border border-white/[0.08]">
                 <div className="text-center flex-1">
-                  <p className="text-lg font-black text-emerald-400">{mappedRows.length - new Set(validationErrors.filter(e => e.field === 'Nome' || e.field === 'Cognome').map(e => e.row)).size}</p>
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Pronte</p>
+                  <p className="text-lg font-bold text-emerald-400">{mappedRows.length - new Set(validationErrors.filter(e => e.field === 'Nome' || e.field === 'Cognome').map(e => e.row)).size}</p>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Pronte</p>
                 </div>
                 <div className="text-center flex-1">
-                  <p className="text-lg font-black text-amber-400">{new Set(validationErrors.filter(e => e.field === 'Nome' || e.field === 'Cognome').map(e => e.row)).size}</p>
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Saltate</p>
+                  <p className="text-lg font-bold text-amber-400">{new Set(validationErrors.filter(e => e.field === 'Nome' || e.field === 'Cognome').map(e => e.row)).size}</p>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Saltate</p>
                 </div>
                 <div className="text-center flex-1">
-                  <p className="text-lg font-black text-zinc-500">{validationErrors.filter(e => e.field !== 'Nome' && e.field !== 'Cognome').length}</p>
-                  <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Avvisi</p>
+                  <p className="text-lg font-bold text-muted-foreground">{validationErrors.filter(e => e.field !== 'Nome' && e.field !== 'Cognome').length}</p>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Avvisi</p>
                 </div>
               </div>
             </div>
@@ -572,39 +591,39 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                   <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mx-auto">
                     <XCircle size={28} className="text-red-500" />
                   </div>
-                  <h4 className="text-sm font-black text-red-400 uppercase tracking-widest">Errore Importazione</h4>
-                  <p className="text-xs text-zinc-400">{importResult.error}</p>
+                  <h4 className="text-sm font-bold text-red-400 uppercase tracking-widest">Errore Importazione</h4>
+                  <p className="text-xs text-muted-foreground">{importResult.error}</p>
                 </>
               ) : (
                 <>
                   <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto">
                     <CheckCircle size={28} className="text-emerald-500" />
                   </div>
-                  <h4 className="text-sm font-black text-white uppercase tracking-widest">Importazione Completata</h4>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-widest">Importazione Completata</h4>
 
                   <div className="flex items-center justify-center gap-6">
                     <div className="text-center">
-                      <p className="text-2xl font-black text-emerald-400">{importResult?.imported || 0}</p>
-                      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Creati</p>
+                      <p className="text-2xl font-bold text-emerald-400">{importResult?.imported || 0}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Creati</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-black text-blue-400">{importResult?.updated || 0}</p>
-                      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Aggiornati</p>
+                      <p className="text-2xl font-bold text-blue-400">{importResult?.updated || 0}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Aggiornati</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-2xl font-black text-zinc-500">{importResult?.skippedCount || 0}</p>
-                      <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Saltati</p>
+                      <p className="text-2xl font-bold text-muted-foreground">{importResult?.skippedCount || 0}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Saltati</p>
                     </div>
                     {(importResult?.errorCount || 0) > 0 && (
                       <div className="text-center">
-                        <p className="text-2xl font-black text-red-400">{importResult.errorCount}</p>
-                        <p className="text-[9px] font-bold text-zinc-600 uppercase tracking-widest">Errori</p>
+                        <p className="text-2xl font-bold text-red-400">{importResult.errorCount}</p>
+                        <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Errori</p>
                       </div>
                     )}
                   </div>
 
                   {importResult?.credentials && importResult.credentials.length > 0 && (
-                    <div className="text-left bg-zinc-900/50 rounded-xl p-4 border border-emerald-500/10 space-y-3">
+                    <div className="text-left bg-white/[0.02] rounded-xl p-4 border border-emerald-500/10 space-y-3">
                       <div className="flex items-center justify-between">
                         <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Credenziali Generate</p>
                         <button
@@ -620,27 +639,27 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
                             link.click();
                             URL.revokeObjectURL(url);
                           }}
-                          className="flex items-center gap-1.5 text-[9px] font-black text-emerald-500 uppercase tracking-widest hover:text-white transition-all"
+                          className="flex items-center gap-1.5 text-[9px] font-bold text-emerald-500 uppercase tracking-widest hover:text-white transition-all"
                         >
                           <Download size={11} /> Scarica CSV
                         </button>
                       </div>
                       <div className="max-h-48 overflow-y-auto space-y-2">
                         {importResult.credentials.map((cred: any, i: number) => (
-                          <div key={i} className="flex items-center gap-4 bg-zinc-800/50 rounded-lg px-3 py-2 border border-white/5">
+                          <div key={i} className="flex items-center gap-4 bg-white/[0.03] rounded-lg px-3 py-2 border border-white/[0.08]">
                             <span className="text-xs font-bold text-white flex-1 truncate">{cred.name}</span>
-                            <span className="text-xs text-zinc-400 truncate max-w-[180px]">{cred.email}</span>
+                            <span className="text-xs text-muted-foreground truncate max-w-[180px]">{cred.email}</span>
                             <span className="text-xs text-emerald-400 font-mono font-bold select-all">{cred.password}</span>
                           </div>
                         ))}
                       </div>
-                      <p className="text-[9px] text-zinc-600 font-bold">Salva o condividi queste credenziali — i talent potranno cambiarle dal proprio profilo.</p>
+                      <p className="text-[9px] text-muted-foreground font-bold">Salva o condividi queste credenziali — i talent potranno cambiarle dal proprio profilo.</p>
                     </div>
                   )}
 
                   {importResult?.errors && importResult.errors.length > 0 && (
-                    <div className="text-left bg-zinc-900/50 rounded-xl p-4 border border-white/5 max-h-40 overflow-y-auto">
-                      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">Errori dal server:</p>
+                    <div className="text-left bg-white/[0.02] rounded-xl p-4 border border-white/[0.08] max-h-40 overflow-y-auto">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-2">Errori dal server:</p>
                       {importResult.errors.map((err: string, i: number) => (
                         <p key={i} className="text-xs text-red-400">{err}</p>
                       ))}
@@ -653,53 +672,57 @@ const ImportWizard: React.FC<{ onClose: () => void; onComplete: (result: any) =>
         </div>
 
         {/* Footer with navigation */}
-        <div className="p-6 border-t border-white/5 flex items-center justify-between flex-shrink-0">
+        <div className="p-6 border-t border-white/[0.08] flex items-center justify-between flex-shrink-0">
           <div>
             {step === 3 && (
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => setStep(1)}
-                className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
+                className="gap-2 text-xs font-bold uppercase tracking-widest"
               >
                 <ChevronLeft size={14} /> Carica altro file
-              </button>
+              </Button>
             )}
             {step === 4 && (
-              <button
+              <Button
+                variant="ghost"
                 onClick={() => setStep(3)}
-                className="flex items-center gap-2 text-zinc-400 hover:text-white text-xs font-bold uppercase tracking-widest transition-colors"
+                className="gap-2 text-xs font-bold uppercase tracking-widest"
               >
                 <ChevronLeft size={14} /> Indietro
-              </button>
+              </Button>
             )}
           </div>
 
           <div className="flex items-center gap-3">
             {step === 5 ? (
-              <button
+              <Button
+                variant="default"
                 onClick={onClose}
-                className="bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                className="font-bold uppercase text-[10px] tracking-widest px-6"
               >
                 Chiudi
-              </button>
+              </Button>
             ) : step === 3 ? (
-              <button
+              <Button
+                variant="default"
                 onClick={runValidation}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-blue-500/20"
+                className="gap-2 font-bold uppercase text-[10px] tracking-widest px-6"
               >
                 Valida <ChevronRight size={14} />
-              </button>
+              </Button>
             ) : step === 4 ? (
-              <button
+              <Button
                 onClick={doImport}
                 disabled={isProcessing}
-                className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-500/20"
+                className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold uppercase text-[10px] tracking-widest px-6 shadow-lg shadow-emerald-500/20"
               >
                 {isProcessing ? (
                   <><Loader2 size={14} className="animate-spin" /> Importazione...</>
                 ) : (
                   <><Check size={14} /> Importa {mappedRows.length - new Set(validationErrors.filter(e => e.field === 'Nome' || e.field === 'Cognome').map(e => e.row)).size} talenti</>
                 )}
-              </button>
+              </Button>
             ) : null}
           </div>
         </div>
@@ -755,61 +778,53 @@ const Roster: React.FC = () => {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+    <AnimatedContainer className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase">Roster</h1>
-          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-            {talents.length} talent &middot; {talents.filter(t => t.status === 'active').length} attivi
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <button
-            onClick={downloadTemplate}
-            className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border border-white/5"
-          >
-            <Download size={14} /> Template
-          </button>
-          <button
-            onClick={() => setShowImportWizard(true)}
-            className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white px-4 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all border border-white/5"
-          >
-            <FileText size={14} /> Importa
-          </button>
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-blue-500/20"
-          >
-            <UserPlus size={14} /> Nuovo Talento
-          </button>
-        </div>
-      </div>
+      <PageHeader
+        title="Roster"
+        subtitle={`${talents.length} talent \u00b7 ${talents.filter(t => t.status === 'active').length} attivi`}
+        actions={
+          <>
+            <Button
+              variant="outline"
+              onClick={downloadTemplate}
+              className="gap-2 font-bold uppercase text-[10px] tracking-widest"
+            >
+              <Download size={14} /> Template
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setShowImportWizard(true)}
+              className="gap-2 font-bold uppercase text-[10px] tracking-widest"
+            >
+              <FileText size={14} /> Importa
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => setShowAddModal(true)}
+              className="gap-2 font-bold uppercase text-[10px] tracking-widest"
+            >
+              <UserPlus size={14} /> Nuovo Talento
+            </Button>
+          </>
+        }
+      />
 
       {/* Search + Filter Bar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        <div className="flex-1 flex items-center bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-2.5 focus-within:border-blue-500/50 transition-all">
-          <Search size={16} className="text-zinc-600 mr-3" />
-          <input
-            type="text"
-            placeholder="Cerca talento..."
-            className="bg-transparent border-none text-xs text-white placeholder-zinc-600 w-full font-bold outline-none"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="text-zinc-600 hover:text-white">
-              <X size={14} />
-            </button>
-          )}
-        </div>
-        <div className="flex items-center bg-zinc-900/50 p-1 rounded-xl border border-white/5">
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Cerca talento..."
+          className="flex-1"
+        />
+        <div className="flex items-center bg-white/[0.02] p-1 rounded-xl border border-white/[0.06]">
           {(['all', 'active', 'inactive'] as const).map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${
-                statusFilter === s ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-white'
+              className={`px-4 py-2 rounded-lg text-[10px] font-bold uppercase tracking-widest transition-all ${
+                statusFilter === s ? 'bg-primary text-primary-foreground shadow-lg' : 'text-muted-foreground hover:text-white'
               }`}
             >
               {s === 'all' ? 'Tutti' : s === 'active' ? 'Attivi' : 'Inattivi'}
@@ -821,13 +836,14 @@ const Roster: React.FC = () => {
       {/* Flashcard Grid - Compact */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
         {filteredTalents.map((talent, idx) => (
-          <motion.div
+          <GlassCard
             key={talent.id}
+            hover
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: idx * 0.02 }}
             onClick={() => navigate(`/roster/${talent.id}`)}
-            className="relative bg-[#0c0c0c] border border-white/5 rounded-2xl p-3 cursor-pointer hover:border-blue-500/40 hover:shadow-lg hover:shadow-blue-500/5 transition-all group"
+            className="relative p-3 cursor-pointer hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 group"
           >
             {/* Copy shipping address button */}
             {(talent.address_street || talent.address_city) && (
@@ -844,47 +860,45 @@ const Roster: React.FC = () => {
                   navigator.clipboard.writeText(parts.join('\n'));
                   showToast('Indirizzo copiato negli appunti', 'success');
                 }}
-                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 bg-zinc-800/90 backdrop-blur rounded-lg text-zinc-400 hover:text-white transition-all z-10"
+                className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 p-1.5 bg-white/[0.06] backdrop-blur rounded-lg text-muted-foreground hover:text-white transition-all z-10"
                 title="Copia indirizzo spedizione"
               >
                 <Copy size={12} />
               </button>
             )}
             <div className="flex items-center gap-3">
-              <div className="w-14 h-14 rounded-full bg-zinc-800 overflow-hidden flex-shrink-0 border-2 border-white/5 group-hover:border-blue-500/30 transition-all">
+              <Avatar className="w-14 h-14 border-2 border-white/[0.08] group-hover:border-primary/30 transition-all">
                 {talent.photoUrl ? (
-                  <img src={talent.photoUrl} className="w-full h-full object-cover" alt="" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm font-black uppercase">
-                    {talent.firstName.charAt(0)}{talent.lastName.charAt(0)}
-                  </div>
-                )}
-              </div>
+                  <AvatarImage src={talent.photoUrl} alt="" />
+                ) : null}
+                <AvatarFallback className="text-sm font-bold">
+                  {talent.firstName.charAt(0)}{talent.lastName.charAt(0)}
+                </AvatarFallback>
+              </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-black text-white truncate leading-tight group-hover:text-blue-400 transition-colors">
+                <p className="text-xs font-bold text-white truncate leading-tight group-hover:text-primary transition-colors">
                   {talent.firstName} {talent.lastName}
                 </p>
                 {talent.stageName && (
-                  <p className="text-[10px] text-zinc-500 truncate">{talent.stageName}</p>
+                  <p className="text-[10px] text-muted-foreground truncate">{talent.stageName}</p>
                 )}
-                <span className={`inline-block mt-1 px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-wider ${
-                  talent.status === 'active'
-                    ? 'bg-emerald-500/10 text-emerald-400'
-                    : 'bg-red-500/10 text-red-400'
-                }`}>
+                <Badge
+                  variant={talent.status === 'active' ? 'success' : 'destructive'}
+                  className="mt-1 text-[8px]"
+                >
                   {talent.status === 'active' ? 'Attivo' : 'Inattivo'}
-                </span>
+                </Badge>
               </div>
             </div>
-          </motion.div>
+          </GlassCard>
         ))}
       </div>
 
       {filteredTalents.length === 0 && (
         <div className="py-20 text-center">
-          <UserPlus size={48} className="mx-auto text-zinc-800 mb-4" />
-          <p className="text-sm font-black text-zinc-600 uppercase tracking-widest">Nessun talento trovato</p>
-          <p className="text-xs text-zinc-700 mt-2">Prova a modificare i filtri o aggiungi un nuovo talento</p>
+          <UserPlus size={48} className="mx-auto text-white/[0.06] mb-4" />
+          <p className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Nessun talento trovato</p>
+          <p className="text-xs text-muted-foreground mt-2">Prova a modificare i filtri o aggiungi un nuovo talento</p>
         </div>
       )}
 
@@ -899,136 +913,104 @@ const Roster: React.FC = () => {
       </AnimatePresence>
 
       {/* Add Modal */}
-      <AnimatePresence>
-        {showAddModal && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setShowAddModal(false)}
-              className="absolute inset-0 bg-black/80 backdrop-blur-lg"
-            />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-lg shadow-3xl overflow-hidden"
-            >
-              <div className="p-8 space-y-6">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-xl font-black text-white uppercase tracking-tight">Nuovo Talento</h3>
-                  <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-                    <X size={18} />
-                  </button>
-                </div>
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="max-w-lg p-8">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold uppercase tracking-tight">Nuovo Talento</DialogTitle>
+          </DialogHeader>
 
-                <form className="space-y-4" onSubmit={handleAdd}>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Nome *</label>
-                      <input
-                        type="text" required
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
-                        value={newTalent.firstName}
-                        onChange={e => setNewTalent({ ...newTalent, firstName: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Cognome *</label>
-                      <input
-                        type="text" required
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
-                        value={newTalent.lastName}
-                        onChange={e => setNewTalent({ ...newTalent, lastName: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Nome d'arte</label>
-                    <input
-                      type="text"
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
-                      placeholder="Opzionale"
-                      value={newTalent.stageName}
-                      onChange={e => setNewTalent({ ...newTalent, stageName: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Email *</label>
-                      <input
-                        type="email" required
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
-                        value={newTalent.email}
-                        onChange={e => setNewTalent({ ...newTalent, email: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Telefono</label>
-                      <input
-                        type="tel"
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
-                        placeholder="+39..."
-                        value={newTalent.phone}
-                        onChange={e => setNewTalent({ ...newTalent, phone: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <button
-                    type="submit"
-                    disabled={isSubmitting}
-                    className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest py-4 rounded-xl transition-all shadow-lg shadow-blue-500/20 mt-2"
-                  >
-                    {isSubmitting ? 'Creazione...' : 'Crea Talento'}
-                  </button>
-                </form>
+          <form className="space-y-4" onSubmit={handleAdd}>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="block mb-1.5">Nome *</Label>
+                <Input
+                  type="text" required
+                  value={newTalent.firstName}
+                  onChange={e => setNewTalent({ ...newTalent, firstName: e.target.value })}
+                />
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              <div>
+                <Label className="block mb-1.5">Cognome *</Label>
+                <Input
+                  type="text" required
+                  value={newTalent.lastName}
+                  onChange={e => setNewTalent({ ...newTalent, lastName: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <div>
+              <Label className="block mb-1.5">Nome d'arte</Label>
+              <Input
+                type="text"
+                placeholder="Opzionale"
+                value={newTalent.stageName}
+                onChange={e => setNewTalent({ ...newTalent, stageName: e.target.value })}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="block mb-1.5">Email *</Label>
+                <Input
+                  type="email" required
+                  value={newTalent.email}
+                  onChange={e => setNewTalent({ ...newTalent, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label className="block mb-1.5">Telefono</Label>
+                <Input
+                  type="tel"
+                  placeholder="+39..."
+                  value={newTalent.phone}
+                  onChange={e => setNewTalent({ ...newTalent, phone: e.target.value })}
+                />
+              </div>
+            </div>
+
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full font-bold uppercase text-[10px] tracking-widest py-4 mt-2"
+            >
+              {isSubmitting ? 'Creazione...' : 'Crea Talento'}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Credentials Modal */}
-      <AnimatePresence>
-        {createdCredentials && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 bg-black/80 backdrop-blur-lg" />
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-md shadow-3xl overflow-hidden p-8 text-center"
-            >
-              <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Check size={28} className="text-emerald-500" />
-              </div>
-              <h3 className="text-xl font-black text-white uppercase tracking-tight mb-2">Talento Creato</h3>
-              <p className="text-xs text-zinc-500 mb-6">Credenziali di accesso — condividile subito</p>
-
-              <div className="bg-zinc-900/50 rounded-xl p-5 border border-white/5 space-y-3 text-left mb-6">
-                <div>
-                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Email</p>
-                  <p className="text-sm font-bold text-white select-all">{createdCredentials.email}</p>
-                </div>
-                <div className="border-t border-white/5 pt-3">
-                  <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Password</p>
-                  <p className="text-sm font-bold text-white select-all font-mono">{createdCredentials.password}</p>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setCreatedCredentials(null)}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-3.5 rounded-xl transition-all"
-              >
-                Ho Salvato le Credenziali
-              </button>
-            </motion.div>
+      <Dialog open={!!createdCredentials} onOpenChange={(open) => { if (!open) setCreatedCredentials(null); }}>
+        <DialogContent className="max-w-md p-8 text-center">
+          <div className="w-14 h-14 bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Check size={28} className="text-emerald-500" />
           </div>
-        )}
-      </AnimatePresence>
-    </motion.div>
+          <DialogHeader className="items-center">
+            <DialogTitle className="text-xl font-bold uppercase tracking-tight">Talento Creato</DialogTitle>
+          </DialogHeader>
+          <p className="text-xs text-muted-foreground mb-6">Credenziali di accesso — condividile subito</p>
+
+          <div className="bg-white/[0.03] backdrop-blur-xl rounded-xl p-5 border border-white/[0.08] space-y-3 text-left mb-6">
+            <div>
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Email</p>
+              <p className="text-sm font-bold text-white select-all">{createdCredentials?.email}</p>
+            </div>
+            <div className="border-t border-white/[0.08] pt-3">
+              <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Password</p>
+              <p className="text-sm font-bold text-white select-all font-mono">{createdCredentials?.password}</p>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => setCreatedCredentials(null)}
+            className="w-full font-bold uppercase text-[10px] tracking-widest"
+          >
+            Ho Salvato le Credenziali
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </AnimatedContainer>
   );
 };
 

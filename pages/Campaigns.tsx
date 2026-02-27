@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Briefcase, Plus, Search, Calendar,
+  Briefcase, Plus, Calendar,
   Users, X, Trash2, ChevronRight, ChevronLeft,
   CheckCircle2, Music, Megaphone, Building2, UserPlus,
   Eye, Edit3, Lock, ListTodo, ArrowRight, Zap, AlertTriangle
@@ -11,6 +11,21 @@ import { format } from 'date-fns';
 import { it } from 'date-fns/locale';
 import { CampaignStatus, CampaignTalentStatus, TaskStatus, TaskPriority } from '../types';
 import { useApp } from '../context/AppContext';
+
+import { GlassCard } from '@/components/ui/glass-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
+import { PageHeader } from '@/components/ui/page-header';
+import { AnimatedContainer } from '@/components/ui/animated-container';
+import { SearchInput } from '@/components/ui/search-input';
+import { staggerContainer, staggerItem } from '@/lib/animations';
 
 // ==================== WIZARD COMPONENT ====================
 
@@ -141,37 +156,26 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
   const stepLabels = ['Tipo', 'Dati', 'Cliente', 'Talenti', 'Compensi'];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="absolute inset-0 bg-black/80 backdrop-blur-lg"
-      />
-      <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-2xl shadow-3xl overflow-hidden max-h-[90vh] flex flex-col"
-      >
+    <Dialog open onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 gap-0">
         {/* Header */}
-        <div className="p-6 border-b border-white/5 flex justify-between items-center">
-          <div>
-            <h3 className="text-xl font-black text-white uppercase tracking-tight">Nuova Campagna</h3>
-            <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-widest mt-1">
+        <div className="p-6 border-b border-white/[0.06]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">
+              Nuova Campagna
+            </DialogTitle>
+            <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-1">
               Passo {step} di 5 — {stepLabels[step - 1]}
             </p>
-          </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white transition-all">
-            <X size={18} />
-          </button>
+          </DialogHeader>
         </div>
 
         {/* Step Indicators */}
         <div className="px-6 pt-4 flex gap-2">
           {stepLabels.map((label, i) => (
             <div key={i} className="flex-1">
-              <div className={`h-1 rounded-full transition-all ${i + 1 <= step ? 'bg-blue-600' : 'bg-zinc-800'}`} />
-              <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${i + 1 <= step ? 'text-blue-400' : 'text-zinc-700'}`}>
+              <div className={`h-1 rounded-full transition-all ${i + 1 <= step ? 'bg-primary' : 'bg-white/[0.06]'}`} />
+              <p className={`text-[8px] font-black uppercase tracking-widest mt-1 ${i + 1 <= step ? 'text-primary' : 'text-muted-foreground/50'}`}>
                 {label}
               </p>
             </div>
@@ -183,30 +187,32 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
           {/* Step 1: Tipo */}
           {step === 1 && (
             <div className="space-y-4">
-              <p className="text-sm text-zinc-400 font-bold">Seleziona il tipo di campagna</p>
+              <p className="text-sm text-muted-foreground font-bold">Seleziona il tipo di campagna</p>
               <div className="grid grid-cols-2 gap-4">
-                <button
+                <GlassCard
+                  variant={tipo === 'Suono' ? 'prominent' : 'interactive'}
+                  hover
                   onClick={() => setTipo('Suono')}
-                  className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${tipo === 'Suono'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-white/10 hover:border-white/20 bg-zinc-900/50'
-                    }`}
+                  className={`p-6 flex flex-col items-center gap-3 cursor-pointer ${
+                    tipo === 'Suono' ? 'border-primary bg-primary/10' : ''
+                  }`}
                 >
-                  <Music size={32} className={tipo === 'Suono' ? 'text-blue-400' : 'text-zinc-500'} />
-                  <span className="text-sm font-black uppercase tracking-widest text-white">Suono</span>
-                  <span className="text-[10px] text-zinc-500">Campagna musicale</span>
-                </button>
-                <button
+                  <Music size={32} className={tipo === 'Suono' ? 'text-primary' : 'text-muted-foreground'} />
+                  <span className="text-sm font-black uppercase tracking-widest text-foreground">Suono</span>
+                  <span className="text-[10px] text-muted-foreground">Campagna musicale</span>
+                </GlassCard>
+                <GlassCard
+                  variant={tipo === 'Brand' ? 'prominent' : 'interactive'}
+                  hover
                   onClick={() => setTipo('Brand')}
-                  className={`p-6 rounded-2xl border-2 transition-all flex flex-col items-center gap-3 ${tipo === 'Brand'
-                    ? 'border-blue-500 bg-blue-500/10'
-                    : 'border-white/10 hover:border-white/20 bg-zinc-900/50'
-                    }`}
+                  className={`p-6 flex flex-col items-center gap-3 cursor-pointer ${
+                    tipo === 'Brand' ? 'border-primary bg-primary/10' : ''
+                  }`}
                 >
-                  <Megaphone size={32} className={tipo === 'Brand' ? 'text-blue-400' : 'text-zinc-500'} />
-                  <span className="text-sm font-black uppercase tracking-widest text-white">Brand</span>
-                  <span className="text-[10px] text-zinc-500">Campagna brand / ADV</span>
-                </button>
+                  <Megaphone size={32} className={tipo === 'Brand' ? 'text-primary' : 'text-muted-foreground'} />
+                  <span className="text-sm font-black uppercase tracking-widest text-foreground">Brand</span>
+                  <span className="text-[10px] text-muted-foreground">Campagna brand / ADV</span>
+                </GlassCard>
               </div>
             </div>
           )}
@@ -215,49 +221,47 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Nome Campagna *</label>
-                <input
-                  type="text" required
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
+                <Label className="block mb-2">Nome Campagna *</Label>
+                <Input
+                  type="text"
+                  required
                   placeholder="es. Lancio Estate 2026"
                   value={nome}
                   onChange={e => setNome(e.target.value)}
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Budget Totale (€) *</label>
-                <input
-                  type="number" required min={1}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
+                <Label className="block mb-2">Budget Totale (&euro;) *</Label>
+                <Input
+                  type="number"
+                  required
+                  min={1}
                   value={budget || ''}
                   onChange={e => setBudget(Number(e.target.value))}
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Data Inizio</label>
-                  <input
+                  <Label className="block mb-2">Data Inizio</Label>
+                  <Input
                     type="date"
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                     value={dataInizio}
                     onChange={e => setDataInizio(e.target.value)}
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Data Fine</label>
-                  <input
+                  <Label className="block mb-2">Data Fine</Label>
+                  <Input
                     type="date"
-                    className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                     value={dataFine}
                     onChange={e => setDataFine(e.target.value)}
                   />
                 </div>
               </div>
               <div>
-                <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Note</label>
-                <textarea
+                <Label className="block mb-2">Note</Label>
+                <Textarea
                   rows={3}
-                  className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none resize-none"
                   placeholder="Note aggiuntive..."
                   value={note}
                   onChange={e => setNote(e.target.value)}
@@ -271,100 +275,93 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
             <div className="space-y-4">
               {!showNewClient ? (
                 <>
-                  <div className="flex items-center bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-2.5 focus-within:border-blue-500/50 transition-all">
-                    <Search size={16} className="text-zinc-600 mr-3" />
-                    <input
-                      type="text"
-                      placeholder="Cerca cliente..."
-                      className="bg-transparent border-none text-xs text-white placeholder-zinc-600 w-full font-bold outline-none"
-                      value={clientSearch}
-                      onChange={e => setClientSearch(e.target.value)}
-                    />
-                  </div>
+                  <SearchInput
+                    value={clientSearch}
+                    onChange={setClientSearch}
+                    placeholder="Cerca cliente..."
+                  />
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {filteredClients.map(c => (
-                      <button
+                      <GlassCard
                         key={c.id}
+                        variant="interactive"
+                        hover
                         onClick={() => setClientId(c.id)}
-                        className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${clientId === c.id
-                          ? 'border-blue-500 bg-blue-500/10'
-                          : 'border-white/5 hover:border-white/10 bg-zinc-900/30'
-                          }`}
+                        className={`p-3 flex items-center gap-3 cursor-pointer ${
+                          clientId === c.id ? 'border-primary bg-primary/10' : ''
+                        }`}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
-                          <Building2 size={14} className="text-zinc-500" />
+                        <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                          <Building2 size={14} className="text-muted-foreground" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-xs font-black text-white truncate">{c.ragione_sociale}</p>
-                          {c.referente && <p className="text-[10px] text-zinc-500 truncate">{c.referente}</p>}
+                          <p className="text-xs font-black text-foreground truncate">{c.ragione_sociale}</p>
+                          {c.referente && <p className="text-[10px] text-muted-foreground truncate">{c.referente}</p>}
                         </div>
-                        {clientId === c.id && <CheckCircle2 size={16} className="text-blue-500" />}
-                      </button>
+                        {clientId === c.id && <CheckCircle2 size={16} className="text-primary" />}
+                      </GlassCard>
                     ))}
                     {filteredClients.length === 0 && (
-                      <p className="text-center text-zinc-600 text-xs py-4">Nessun cliente trovato</p>
+                      <p className="text-center text-muted-foreground text-xs py-4">Nessun cliente trovato</p>
                     )}
                   </div>
-                  <button
+                  <Button
+                    variant="outline"
+                    className="w-full border-dashed"
                     onClick={() => { setShowNewClient(true); setClientId(''); }}
-                    className="w-full py-3 border border-dashed border-white/20 rounded-xl text-zinc-500 font-black uppercase text-[10px] tracking-widest hover:border-blue-500 hover:text-blue-500 transition-all flex items-center justify-center gap-2"
                   >
                     <Plus size={14} /> Crea Nuovo Cliente
-                  </button>
+                  </Button>
                 </>
               ) : (
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <p className="text-xs font-black text-blue-400 uppercase tracking-widest">Nuovo Cliente</p>
-                    <button onClick={() => setShowNewClient(false)} className="text-[10px] text-zinc-500 hover:text-white font-bold">
+                    <p className="text-xs font-black text-primary uppercase tracking-widest">Nuovo Cliente</p>
+                    <Button variant="ghost" size="sm" onClick={() => setShowNewClient(false)}>
                       Scegli esistente
-                    </button>
+                    </Button>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Tipo</label>
-                      <input
+                      <Label className="block mb-2">Tipo</Label>
+                      <Input
                         type="text"
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                         placeholder="es. Agenzia, Brand..."
                         value={newClient.tipo}
                         onChange={e => setNewClient({ ...newClient, tipo: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Ragione Sociale *</label>
-                      <input
-                        type="text" required
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
+                      <Label className="block mb-2">Ragione Sociale *</Label>
+                      <Input
+                        type="text"
+                        required
                         value={newClient.ragione_sociale}
                         onChange={e => setNewClient({ ...newClient, ragione_sociale: e.target.value })}
                       />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Referente</label>
-                    <input
+                    <Label className="block mb-2">Referente</Label>
+                    <Input
                       type="text"
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                       value={newClient.referente}
                       onChange={e => setNewClient({ ...newClient, referente: e.target.value })}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Email</label>
-                      <input
+                      <Label className="block mb-2">Email</Label>
+                      <Input
                         type="email"
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                         value={newClient.email}
                         onChange={e => setNewClient({ ...newClient, email: e.target.value })}
                       />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Telefono</label>
-                      <input
+                      <Label className="block mb-2">Telefono</Label>
+                      <Input
                         type="tel"
-                        className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                         value={newClient.telefono}
                         onChange={e => setNewClient({ ...newClient, telefono: e.target.value })}
                       />
@@ -378,16 +375,11 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
           {/* Step 4: Talenti */}
           {step === 4 && (
             <div className="space-y-4">
-              <div className="flex items-center bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-2.5 focus-within:border-blue-500/50 transition-all">
-                <Search size={16} className="text-zinc-600 mr-3" />
-                <input
-                  type="text"
-                  placeholder="Cerca talent..."
-                  className="bg-transparent border-none text-xs text-white placeholder-zinc-600 w-full font-bold outline-none"
-                  value={talentSearch}
-                  onChange={e => setTalentSearch(e.target.value)}
-                />
-              </div>
+              <SearchInput
+                value={talentSearch}
+                onChange={setTalentSearch}
+                placeholder="Cerca talent..."
+              />
 
               {selectedTalentIds.length > 0 && (
                 <div className="flex flex-wrap gap-2">
@@ -395,10 +387,10 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
                     const t = talents.find(x => x.id === id);
                     if (!t) return null;
                     return (
-                      <span key={id} className="inline-flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest">
+                      <Badge key={id} variant="default" className="gap-1.5 pl-3 pr-1.5 py-1.5">
                         {t.firstName} {t.lastName}
-                        <button onClick={() => toggleTalent(id)} className="hover:text-white"><X size={12} /></button>
-                      </span>
+                        <button onClick={() => toggleTalent(id)} className="hover:text-foreground ml-1"><X size={12} /></button>
+                      </Badge>
                     );
                   })}
                 </div>
@@ -408,34 +400,34 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
                 {filteredTalents.map(t => {
                   const selected = selectedTalentIds.includes(t.id);
                   return (
-                    <button
+                    <GlassCard
                       key={t.id}
+                      variant="interactive"
+                      hover
                       onClick={() => toggleTalent(t.id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${selected
-                        ? 'border-blue-500 bg-blue-500/10'
-                        : 'border-white/5 hover:border-white/10 bg-zinc-900/30'
-                        }`}
+                      className={`p-3 flex items-center gap-3 cursor-pointer ${
+                        selected ? 'border-primary bg-primary/10' : ''
+                      }`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden flex-shrink-0 border border-white/5">
+                      <Avatar className="h-10 w-10">
                         {t.photoUrl ? (
-                          <img src={t.photoUrl} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[10px] font-black uppercase">
-                            {t.firstName.charAt(0)}{t.lastName.charAt(0)}
-                          </div>
-                        )}
-                      </div>
+                          <AvatarImage src={t.photoUrl} alt={`${t.firstName} ${t.lastName}`} />
+                        ) : null}
+                        <AvatarFallback>
+                          {t.firstName.charAt(0)}{t.lastName.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black text-white truncate">{t.firstName} {t.lastName}</p>
-                        {t.stageName && <p className="text-[10px] text-zinc-500 truncate">{t.stageName}</p>}
+                        <p className="text-xs font-black text-foreground truncate">{t.firstName} {t.lastName}</p>
+                        {t.stageName && <p className="text-[10px] text-muted-foreground truncate">{t.stageName}</p>}
                       </div>
-                      {selected && <CheckCircle2 size={16} className="text-blue-500" />}
-                    </button>
+                      {selected && <CheckCircle2 size={16} className="text-primary" />}
+                    </GlassCard>
                   );
                 })}
               </div>
 
-              <p className="text-[10px] text-zinc-600 font-bold text-center">
+              <p className="text-[10px] text-muted-foreground font-bold text-center">
                 {selectedTalentIds.length} talent selezionat{selectedTalentIds.length === 1 ? 'o' : 'i'}
               </p>
             </div>
@@ -445,7 +437,7 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
           {step === 5 && (
             <div className="space-y-4">
               {selectedTalentIds.length === 0 ? (
-                <p className="text-center text-zinc-500 text-xs py-8">Nessun talent selezionato</p>
+                <p className="text-center text-muted-foreground text-xs py-8">Nessun talent selezionato</p>
               ) : (
                 <>
                   <div className="space-y-3">
@@ -453,59 +445,58 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
                       const t = talents.find(x => x.id === id);
                       if (!t) return null;
                       return (
-                        <div key={id} className="flex items-center gap-3 p-3 bg-zinc-900/30 rounded-xl border border-white/5">
-                          <div className="w-10 h-10 rounded-full bg-zinc-800 overflow-hidden flex-shrink-0 border border-white/5">
+                        <GlassCard key={id} className="p-3 flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
                             {t.photoUrl ? (
-                              <img src={t.photoUrl} className="w-full h-full object-cover" alt="" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[10px] font-black uppercase">
-                                {t.firstName.charAt(0)}{t.lastName.charAt(0)}
-                              </div>
-                            )}
-                          </div>
+                              <AvatarImage src={t.photoUrl} alt={`${t.firstName} ${t.lastName}`} />
+                            ) : null}
+                            <AvatarFallback>
+                              {t.firstName.charAt(0)}{t.lastName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
                           <div className="min-w-0 flex-1">
-                            <p className="text-xs font-black text-white truncate">{t.firstName} {t.lastName}</p>
+                            <p className="text-xs font-black text-foreground truncate">{t.firstName} {t.lastName}</p>
                           </div>
                           <div className="flex items-center gap-1">
-                            <span className="text-zinc-500 text-sm font-bold">€</span>
-                            <input
+                            <span className="text-muted-foreground text-sm font-bold">&euro;</span>
+                            <Input
                               type="number"
                               min={0}
-                              className="w-28 bg-zinc-900/50 border border-white/10 rounded-lg px-3 py-2 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none text-right"
+                              className="w-28 text-right"
                               placeholder="0"
                               value={compensi[id] || ''}
                               onChange={e => setCompensi(prev => ({ ...prev, [id]: Number(e.target.value) }))}
                             />
                           </div>
-                        </div>
+                        </GlassCard>
                       );
                     })}
                   </div>
 
-                  <div className="bg-zinc-900/50 border border-white/5 rounded-xl p-4 space-y-2">
+                  <GlassCard variant="prominent" className="p-4 space-y-2">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Budget Totale</span>
-                      <span className="text-sm font-black text-white">€{budget.toLocaleString()}</span>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Budget Totale</span>
+                      <span className="text-sm font-black text-foreground">&euro;{budget.toLocaleString()}</span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Totale Compensi</span>
-                      <span className="text-sm font-black text-blue-400">€{totalCompensi.toLocaleString()}</span>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Totale Compensi</span>
+                      <span className="text-sm font-black text-primary">&euro;{totalCompensi.toLocaleString()}</span>
                     </div>
-                    <div className="h-px bg-white/5" />
+                    <Separator />
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black text-zinc-500 uppercase tracking-widest">Budget Residuo</span>
+                      <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Budget Residuo</span>
                       <span className={`text-sm font-black ${budgetResiduo >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        €{budgetResiduo.toLocaleString()}
+                        &euro;{budgetResiduo.toLocaleString()}
                       </span>
                     </div>
-                  </div>
+                  </GlassCard>
 
                   {budgetResiduo < 0 && (
-                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-center">
+                    <GlassCard className="bg-red-500/10 border-red-500/20 p-3 text-center">
                       <p className="text-[10px] font-black text-red-400 uppercase tracking-widest">
-                        Attenzione: il totale dei compensi supera il budget di €{Math.abs(budgetResiduo).toLocaleString()}
+                        Attenzione: il totale dei compensi supera il budget di &euro;{Math.abs(budgetResiduo).toLocaleString()}
                       </p>
-                    </div>
+                    </GlassCard>
                   )}
                 </>
               )}
@@ -514,35 +505,36 @@ const CampaignWizard: React.FC<WizardProps> = ({ onClose, preselectedClientId })
         </div>
 
         {/* Footer */}
-        <div className="p-6 border-t border-white/5 flex justify-between items-center">
-          <button
+        <div className="p-6 border-t border-white/[0.06] flex justify-between items-center">
+          <Button
+            variant="ghost"
             onClick={() => step > 1 ? setStep(step - 1) : onClose()}
-            className="flex items-center gap-2 text-zinc-500 hover:text-white font-black uppercase text-[10px] tracking-widest transition-all"
+            className="gap-2 text-[10px] font-black uppercase tracking-widest"
           >
             <ChevronLeft size={14} />
             {step > 1 ? 'Indietro' : 'Annulla'}
-          </button>
+          </Button>
 
           {step < 5 ? (
-            <button
+            <Button
               onClick={() => setStep(step + 1)}
               disabled={!canNext()}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-blue-500/20"
+              className="gap-2 text-[10px] font-black uppercase tracking-widest"
             >
               Avanti <ChevronRight size={14} />
-            </button>
+            </Button>
           ) : (
-            <button
+            <Button
               onClick={handleSubmit}
               disabled={isSubmitting}
-              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-emerald-500/20"
+              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20"
             >
               {isSubmitting ? 'Creazione...' : 'Crea Campagna'}
-            </button>
+            </Button>
           )}
         </div>
-      </motion.div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 };
 
@@ -653,12 +645,18 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
     return available;
   }, [talents, cts, addTalentSearch]);
 
-  const tabs = [
-    { id: 'panoramica', label: 'Panoramica', icon: <Eye size={14} /> },
-    { id: 'talenti', label: 'Talenti', icon: <Users size={14} /> },
-    { id: 'cliente', label: 'Cliente', icon: <Building2 size={14} /> },
-    { id: 'attivita', label: 'Attività', icon: <ListTodo size={14} /> }
-  ];
+  const getStatusBadgeVariant = (status: string): "default" | "success" | "warning" | "secondary" | "destructive" => {
+    switch (status) {
+      case CampaignStatus.ACTIVE: return 'default';
+      case CampaignStatus.CLOSED: return 'secondary';
+      case CampaignStatus.DRAFT: return 'warning';
+      default: return 'secondary';
+    }
+  };
+
+  const getTipoBadgeVariant = (campaignTipo: string): "default" | "success" => {
+    return campaignTipo === 'Suono' ? 'default' : 'success';
+  };
 
   return (
     <div className="fixed inset-0 z-[100] flex justify-end">
@@ -671,25 +669,25 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
         initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
         transition={{ type: 'spring', damping: 25, stiffness: 200 }}
         onClick={e => e.stopPropagation()}
-        className="relative w-full max-w-4xl h-full bg-[#0c0c0c] border-l border-white/10 shadow-2xl flex flex-col"
+        className="relative w-full max-w-4xl h-full bg-white/[0.02] backdrop-blur-2xl border-l border-white/[0.1] shadow-2xl flex flex-col"
       >
         {/* Header */}
-        <div className="p-6 border-b border-white/5 bg-zinc-900/50">
+        <div className="p-6 border-b border-white/[0.06] bg-white/[0.03] backdrop-blur-xl">
           <div className="flex justify-between items-start">
             <div>
               <div className="flex items-center gap-2 mb-2">
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${campaign.status === CampaignStatus.ACTIVE ? 'bg-blue-500/20 text-blue-400' :
-                  campaign.status === CampaignStatus.CLOSED ? 'bg-zinc-700/50 text-zinc-400' : 'bg-amber-500/20 text-amber-400'
-                  }`}>
+                <Badge variant={getStatusBadgeVariant(campaign.status)}>
                   {campaign.status}
-                </span>
-                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${campaign.tipo === 'Suono' ? 'bg-purple-500/20 text-purple-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                </Badge>
+                <Badge variant={getTipoBadgeVariant(campaign.tipo || 'Brand')} className={
+                  campaign.tipo === 'Suono' ? 'bg-purple-500/15 text-purple-400 border-purple-500/20' : ''
+                }>
                   {campaign.tipo || 'Brand'}
-                </span>
+                </Badge>
               </div>
-              <h2 className="text-2xl font-black text-white uppercase tracking-tight">{campaign.name}</h2>
-              {client && <p className="text-xs text-zinc-500 font-bold mt-1">{client.ragione_sociale}</p>}
-              <div className="flex items-center gap-4 mt-2 text-[10px] text-zinc-500 font-bold">
+              <h2 className="text-2xl font-black text-foreground uppercase tracking-tight">{campaign.name}</h2>
+              {client && <p className="text-xs text-muted-foreground font-bold mt-1">{client.ragione_sociale}</p>}
+              <div className="flex items-center gap-4 mt-2 text-[10px] text-muted-foreground font-bold">
                 {campaign.data_inizio && (
                   <span className="flex items-center gap-1">
                     <Calendar size={12} /> {format(new Date(campaign.data_inizio), 'dd MMM yyyy', { locale: it })}
@@ -703,37 +701,47 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={handleStartEdit} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all" title="Modifica">
+              <Button variant="ghost" size="icon" onClick={handleStartEdit} title="Modifica">
                 <Edit3 size={16} />
-              </button>
+              </Button>
               {campaign.status === CampaignStatus.DRAFT ? (
-                <button onClick={handleToggleStatus} className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-500/20">
+                <Button onClick={handleToggleStatus} className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20" size="sm">
                   <Zap size={14} /> Attiva Campagna
-                </button>
+                </Button>
               ) : (
-                <button onClick={handleToggleStatus} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all" title={isClosed ? 'Riapri' : 'Chiudi'}>
+                <Button variant="ghost" size="icon" onClick={handleToggleStatus} title={isClosed ? 'Riapri' : 'Chiudi'}>
                   {isClosed ? <CheckCircle2 size={16} /> : <Lock size={16} />}
-                </button>
+                </Button>
               )}
-              <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-white transition-all">
+              <Button variant="ghost" size="icon" onClick={onClose}>
                 <X size={18} />
-              </button>
+              </Button>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex p-3 gap-1 border-b border-white/5">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'}`}
-            >
-              {tab.icon}
-              <span>{tab.label}</span>
-            </button>
-          ))}
+        <div className="px-3 pt-3 border-b border-white/[0.06]">
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
+            <TabsList className="w-full justify-start">
+              <TabsTrigger value="panoramica" className="gap-1.5">
+                <Eye size={14} />
+                <span>Panoramica</span>
+              </TabsTrigger>
+              <TabsTrigger value="talenti" className="gap-1.5">
+                <Users size={14} />
+                <span>Talenti</span>
+              </TabsTrigger>
+              <TabsTrigger value="cliente" className="gap-1.5">
+                <Building2 size={14} />
+                <span>Cliente</span>
+              </TabsTrigger>
+              <TabsTrigger value="attivita" className="gap-1.5">
+                <ListTodo size={14} />
+                <span>Attivit&agrave;</span>
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* Content */}
@@ -742,141 +750,160 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
           {activeTab === 'panoramica' && (
             <div className="space-y-6">
               {isEditing ? (
-                <div className="space-y-4 bg-zinc-900/30 p-6 rounded-2xl border border-white/5">
+                <GlassCard variant="prominent" className="p-6 space-y-4">
                   <div>
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Nome</label>
-                    <input
+                    <Label className="block mb-2">Nome</Label>
+                    <Input
                       type="text"
-                      className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
                       value={editData.name}
                       onChange={e => setEditData({ ...editData, name: e.target.value })}
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Data Inizio</label>
-                      <input type="date" className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none" value={editData.data_inizio} onChange={e => setEditData({ ...editData, data_inizio: e.target.value })} />
+                      <Label className="block mb-2">Data Inizio</Label>
+                      <Input type="date" value={editData.data_inizio} onChange={e => setEditData({ ...editData, data_inizio: e.target.value })} />
                     </div>
                     <div>
-                      <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Data Fine</label>
-                      <input type="date" className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none" value={editData.data_fine} onChange={e => setEditData({ ...editData, data_fine: e.target.value })} />
+                      <Label className="block mb-2">Data Fine</Label>
+                      <Input type="date" value={editData.data_fine} onChange={e => setEditData({ ...editData, data_fine: e.target.value })} />
                     </div>
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Note</label>
-                    <textarea rows={3} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none resize-none" value={editData.notes} onChange={e => setEditData({ ...editData, notes: e.target.value })} />
+                    <Label className="block mb-2">Note</Label>
+                    <Textarea rows={3} value={editData.notes} onChange={e => setEditData({ ...editData, notes: e.target.value })} />
                   </div>
                   <div className="flex gap-2">
-                    <button onClick={handleSaveEdit} className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all">Salva</button>
-                    <button onClick={() => setIsEditing(false)} className="px-6 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all">Annulla</button>
+                    <Button onClick={handleSaveEdit} className="flex-1 text-[10px] font-black uppercase tracking-widest">
+                      Salva
+                    </Button>
+                    <Button variant="secondary" onClick={() => setIsEditing(false)} className="text-[10px] font-black uppercase tracking-widest">
+                      Annulla
+                    </Button>
                   </div>
-                </div>
+                </GlassCard>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Budget</p>
-                      <p className="text-2xl font-black text-white">€{campaign.totalBudget.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Compensi Talent</p>
-                      <p className="text-2xl font-black text-blue-400">€{totalCompensi.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Margine</p>
-                      <p className={`text-2xl font-black ${(campaign.totalBudget - totalCompensi) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                        €{(campaign.totalBudget - totalCompensi).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
+                  <motion.div
+                    variants={staggerContainer}
+                    initial="hidden"
+                    animate="show"
+                    className="grid grid-cols-3 gap-4"
+                  >
+                    <motion.div variants={staggerItem}>
+                      <GlassCard className="p-5">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Budget</p>
+                        <p className="text-2xl font-black text-foreground">&euro;{campaign.totalBudget.toLocaleString()}</p>
+                      </GlassCard>
+                    </motion.div>
+                    <motion.div variants={staggerItem}>
+                      <GlassCard className="p-5">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Compensi Talent</p>
+                        <p className="text-2xl font-black text-primary">&euro;{totalCompensi.toLocaleString()}</p>
+                      </GlassCard>
+                    </motion.div>
+                    <motion.div variants={staggerItem}>
+                      <GlassCard className="p-5">
+                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Margine</p>
+                        <p className={`text-2xl font-black ${(campaign.totalBudget - totalCompensi) >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                          &euro;{(campaign.totalBudget - totalCompensi).toLocaleString()}
+                        </p>
+                      </GlassCard>
+                    </motion.div>
+                  </motion.div>
 
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Incassato</p>
-                      <p className="text-xl font-black text-emerald-400">€{totalIncomeReceived.toLocaleString()}</p>
-                      <p className="text-[10px] text-zinc-600 font-bold mt-1">
-                        su €{campaignIncome.reduce((s, i) => s + i.amount, 0).toLocaleString()} pianificato
+                    <GlassCard className="p-5">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Incassato</p>
+                      <p className="text-xl font-black text-emerald-400">&euro;{totalIncomeReceived.toLocaleString()}</p>
+                      <p className="text-[10px] text-muted-foreground/60 font-bold mt-1">
+                        su &euro;{campaignIncome.reduce((s, i) => s + i.amount, 0).toLocaleString()} pianificato
                       </p>
-                    </div>
-                    <div className="bg-zinc-900/50 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-1">Talent Pagati</p>
-                      <p className="text-xl font-black text-white">{cts.filter(ct => ct.stato === CampaignTalentStatus.PAID).length} / {cts.length}</p>
-                      <p className="text-[10px] text-zinc-600 font-bold mt-1">
-                        €{totalPaid.toLocaleString()} su €{totalCompensi.toLocaleString()}
+                    </GlassCard>
+                    <GlassCard className="p-5">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-1">Talent Pagati</p>
+                      <p className="text-xl font-black text-foreground">{cts.filter(ct => ct.stato === CampaignTalentStatus.PAID).length} / {cts.length}</p>
+                      <p className="text-[10px] text-muted-foreground/60 font-bold mt-1">
+                        &euro;{totalPaid.toLocaleString()} su &euro;{totalCompensi.toLocaleString()}
                       </p>
-                    </div>
+                    </GlassCard>
                   </div>
 
                   {campaign.notes && (
-                    <div className="bg-zinc-900/30 p-5 rounded-2xl border border-white/5">
-                      <p className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-2">Note</p>
+                    <GlassCard className="p-5">
+                      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest mb-2">Note</p>
                       <p className="text-sm text-zinc-300 whitespace-pre-wrap">{campaign.notes}</p>
-                    </div>
+                    </GlassCard>
                   )}
 
                   {/* Income Section */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
-                      <h4 className="text-xs font-black text-zinc-400 uppercase tracking-widest">Piano di Fatturazione</h4>
+                      <h4 className="text-xs font-black text-muted-foreground uppercase tracking-widest">Piano di Fatturazione</h4>
                     </div>
                     {campaignIncome.map(inc => (
-                      <div key={inc.id} className="bg-zinc-900/50 p-4 rounded-xl border border-white/5 flex justify-between items-center group">
+                      <GlassCard key={inc.id} className="p-4 flex justify-between items-center group">
                         <div>
-                          <p className="text-sm font-bold text-white">{inc.note || 'Fattura'}</p>
-                          <p className="text-[10px] text-zinc-500">{format(new Date(inc.date), 'dd MMM yyyy', { locale: it })}</p>
+                          <p className="text-sm font-bold text-foreground">{inc.note || 'Fattura'}</p>
+                          <p className="text-[10px] text-muted-foreground">{format(new Date(inc.date), 'dd MMM yyyy', { locale: it })}</p>
                         </div>
                         <div className="flex items-center gap-3">
-                          <p className="text-sm font-black text-white">€{inc.amount.toLocaleString()}</p>
-                          <button
+                          <p className="text-sm font-black text-foreground">&euro;{inc.amount.toLocaleString()}</p>
+                          <Badge
+                            variant={inc.status === 'received' ? 'success' : 'warning'}
+                            className="cursor-pointer"
                             onClick={() => updateIncome(inc.id, { status: inc.status === 'received' ? 'pending' : 'received' })}
-                            className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest ${inc.status === 'received' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/20 text-amber-400'}`}
                           >
                             {inc.status === 'received' ? 'Incassato' : 'In attesa'}
-                          </button>
-                          <button onClick={() => deleteIncome(inc.id)} className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all">
+                          </Badge>
+                          <button onClick={() => deleteIncome(inc.id)} className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all">
                             <Trash2 size={14} />
                           </button>
                         </div>
-                      </div>
+                      </GlassCard>
                     ))}
 
                     {showIncomeForm ? (
-                      <div className="bg-zinc-900 border border-blue-500/30 rounded-xl p-4 space-y-3">
+                      <GlassCard variant="prominent" className="p-4 space-y-3 border-primary/30">
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="text-[9px] font-bold text-zinc-500 uppercase">Importo (€)</label>
-                            <input type="number" className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-bold focus:outline-none" value={newIncomeData.amount || ''} onChange={e => setNewIncomeData({ ...newIncomeData, amount: Number(e.target.value) })} />
+                            <Label className="block mb-1">Importo (&euro;)</Label>
+                            <Input type="number" value={newIncomeData.amount || ''} onChange={e => setNewIncomeData({ ...newIncomeData, amount: Number(e.target.value) })} />
                           </div>
                           <div>
-                            <label className="text-[9px] font-bold text-zinc-500 uppercase">Data</label>
-                            <input type="date" className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-bold focus:outline-none" value={newIncomeData.date} onChange={e => setNewIncomeData({ ...newIncomeData, date: e.target.value })} />
+                            <Label className="block mb-1">Data</Label>
+                            <Input type="date" value={newIncomeData.date} onChange={e => setNewIncomeData({ ...newIncomeData, date: e.target.value })} />
                           </div>
                         </div>
                         <div>
-                          <label className="text-[9px] font-bold text-zinc-500 uppercase">Descrizione</label>
-                          <input type="text" className="w-full bg-black/50 border border-white/10 rounded-lg px-3 py-2 text-white text-sm font-bold focus:outline-none" placeholder="es. Acconto 30%" value={newIncomeData.note} onChange={e => setNewIncomeData({ ...newIncomeData, note: e.target.value })} />
+                          <Label className="block mb-1">Descrizione</Label>
+                          <Input type="text" placeholder="es. Acconto 30%" value={newIncomeData.note} onChange={e => setNewIncomeData({ ...newIncomeData, note: e.target.value })} />
                         </div>
                         <div className="flex gap-2">
-                          <button
+                          <Button
                             onClick={async () => {
                               if (newIncomeData.amount <= 0) return;
                               await addIncome({ campaignId: campaign.id, ...newIncomeData, status: 'pending' });
                               setShowIncomeForm(false);
                               setNewIncomeData({ amount: 0, note: '', date: format(new Date(), 'yyyy-MM-dd') });
                             }}
-                            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-xs font-black uppercase tracking-widest"
+                            className="flex-1 text-xs font-black uppercase tracking-widest"
                           >
                             Salva
-                          </button>
-                          <button onClick={() => setShowIncomeForm(false)} className="px-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-400 rounded-lg">
+                          </Button>
+                          <Button variant="ghost" size="icon" onClick={() => setShowIncomeForm(false)}>
                             <X size={16} />
-                          </button>
+                          </Button>
                         </div>
-                      </div>
+                      </GlassCard>
                     ) : (
-                      <button onClick={() => setShowIncomeForm(true)} className="w-full py-3 border border-dashed border-white/20 rounded-xl text-zinc-500 font-black uppercase text-[10px] tracking-widest hover:border-blue-500 hover:text-blue-500 transition-all flex items-center justify-center gap-2">
+                      <Button
+                        variant="outline"
+                        className="w-full border-dashed"
+                        onClick={() => setShowIncomeForm(true)}
+                      >
                         <Plus size={14} /> Aggiungi Fattura / Incasso
-                      </button>
+                      </Button>
                     )}
                   </div>
                 </>
@@ -888,13 +915,13 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
           {activeTab === 'talenti' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest">
+                <h3 className="text-sm font-black text-foreground uppercase tracking-widest">
                   Talenti Coinvolti ({cts.length})
                 </h3>
                 {!isClosed && (
-                  <button onClick={() => setShowAddTalent(true)} className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">
+                  <Button onClick={() => setShowAddTalent(true)} size="sm" className="gap-1.5 text-[10px] font-black uppercase tracking-widest">
                     <UserPlus size={14} /> Aggiungi
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -902,57 +929,58 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
                 const talent = talents.find(t => t.id === ct.talent_id);
                 const statusOptions = Object.values(CampaignTalentStatus);
                 return (
-                  <div key={ct.id} className="bg-zinc-900/50 border border-white/5 rounded-2xl p-5 space-y-3">
+                  <GlassCard key={ct.id} className="p-5 space-y-3">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-zinc-800 overflow-hidden flex-shrink-0 border-2 border-white/5">
+                      <Avatar className="h-12 w-12 border-2 border-white/[0.06]">
                         {talent?.photoUrl ? (
-                          <img src={talent.photoUrl} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                          <div className="w-full h-full flex items-center justify-center text-zinc-600 text-xs font-black uppercase">
-                            {talent ? `${talent.firstName.charAt(0)}${talent.lastName.charAt(0)}` : '?'}
-                          </div>
-                        )}
-                      </div>
+                          <AvatarImage src={talent.photoUrl} alt={talent ? `${talent.firstName} ${talent.lastName}` : ''} />
+                        ) : null}
+                        <AvatarFallback>
+                          {talent ? `${talent.firstName.charAt(0)}${talent.lastName.charAt(0)}` : '?'}
+                        </AvatarFallback>
+                      </Avatar>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-black text-white">
+                        <p className="text-sm font-black text-foreground">
                           {talent ? `${talent.firstName} ${talent.lastName}` : ct.talent_id}
                         </p>
-                        {talent?.stageName && <p className="text-[10px] text-zinc-500">{talent.stageName}</p>}
+                        {talent?.stageName && <p className="text-[10px] text-muted-foreground">{talent.stageName}</p>}
                       </div>
                       <div className="text-right">
-                        <p className="text-lg font-black text-white">€{ct.compenso_lordo.toLocaleString()}</p>
+                        <p className="text-lg font-black text-foreground">&euro;{ct.compenso_lordo.toLocaleString()}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2 flex-wrap">
                       {statusOptions.filter(s => s !== CampaignTalentStatus.DECLINED).map(status => {
-                        const statusStyle = ct.stato === status
-                          ? status === CampaignTalentStatus.PAID ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                            : status === CampaignTalentStatus.DELIVERED ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                              : status === CampaignTalentStatus.CONFIRMED ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                : status === CampaignTalentStatus.PENDING ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'
-                                  : 'bg-zinc-700/50 text-zinc-300 border border-zinc-600/30'
-                          : 'bg-zinc-900/50 text-zinc-600 border border-white/5 hover:text-zinc-400';
+                        const isActive = ct.stato === status;
+                        let badgeClass = 'bg-white/[0.04] text-muted-foreground border-white/[0.06] hover:text-foreground/80 cursor-pointer';
+                        if (isActive) {
+                          if (status === CampaignTalentStatus.PAID) badgeClass = 'bg-emerald-500/15 text-emerald-400 border-emerald-500/20';
+                          else if (status === CampaignTalentStatus.DELIVERED) badgeClass = 'bg-blue-500/15 text-blue-400 border-blue-500/20';
+                          else if (status === CampaignTalentStatus.CONFIRMED) badgeClass = 'bg-green-500/15 text-green-400 border-green-500/20';
+                          else if (status === CampaignTalentStatus.PENDING) badgeClass = 'bg-yellow-500/15 text-yellow-400 border-yellow-500/20';
+                          else badgeClass = 'bg-zinc-700/50 text-zinc-300 border-zinc-600/30';
+                        }
                         const statusLabel = status === CampaignTalentStatus.INVITED ? 'Invitato'
                           : status === CampaignTalentStatus.PENDING ? 'In Attesa'
                             : status === CampaignTalentStatus.CONFIRMED ? 'Confermato'
                               : status === CampaignTalentStatus.DELIVERED ? 'Consegnato' : 'Pagato';
                         return (
-                          <button
+                          <Badge
                             key={status}
+                            variant="outline"
                             onClick={() => !isClosed && updateCampaignTalent(ct.id, { stato: status })}
-                            disabled={isClosed}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${statusStyle} ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            className={`cursor-pointer transition-all ${badgeClass} ${isClosed ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             {statusLabel}
-                          </button>
+                          </Badge>
                         );
                       })}
 
                       {!isClosed && (
                         <button
                           onClick={() => deleteCampaignTalent(ct.id)}
-                          className="ml-auto p-1.5 text-zinc-600 hover:text-red-400 transition-all"
+                          className="ml-auto p-1.5 text-muted-foreground hover:text-red-400 transition-all"
                         >
                           <Trash2 size={14} />
                         </button>
@@ -960,59 +988,75 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
                     </div>
 
                     {ct.note && (
-                      <p className="text-[10px] text-zinc-500 bg-zinc-900/30 p-2 rounded-lg">{ct.note}</p>
+                      <p className="text-[10px] text-muted-foreground bg-white/[0.03] p-2 rounded-lg">{ct.note}</p>
                     )}
-                  </div>
+                  </GlassCard>
                 );
               })}
 
               {cts.length === 0 && (
-                <p className="text-center text-zinc-600 text-xs py-10">Nessun talent associato a questa campagna</p>
+                <p className="text-center text-muted-foreground text-xs py-10">Nessun talent associato a questa campagna</p>
               )}
 
               {/* Add Talent Modal */}
-              <AnimatePresence>
-                {showAddTalent && (
-                  <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowAddTalent(false)} className="absolute inset-0 bg-black/80 backdrop-blur-lg" />
-                    <motion.div
-                      initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
-                      className="relative bg-[#0c0c0c] border border-white/10 rounded-3xl w-full max-w-md shadow-3xl p-6 space-y-4"
-                    >
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-black text-white uppercase tracking-tight">Aggiungi Talent</h3>
-                        <button onClick={() => setShowAddTalent(false)} className="p-2 hover:bg-zinc-900 rounded-xl text-zinc-500 hover:text-white"><X size={16} /></button>
-                      </div>
+              <Dialog open={showAddTalent} onOpenChange={setShowAddTalent}>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="text-lg font-black uppercase tracking-tight">
+                      Aggiungi Talent
+                    </DialogTitle>
+                  </DialogHeader>
 
-                      <div className="flex items-center bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-2.5">
-                        <Search size={14} className="text-zinc-600 mr-2" />
-                        <input type="text" placeholder="Cerca talent..." className="bg-transparent border-none text-xs text-white placeholder-zinc-600 w-full font-bold outline-none" value={addTalentSearch} onChange={e => setAddTalentSearch(e.target.value)} />
-                      </div>
+                  <SearchInput
+                    value={addTalentSearch}
+                    onChange={setAddTalentSearch}
+                    placeholder="Cerca talent..."
+                  />
 
-                      <div className="space-y-2 max-h-40 overflow-y-auto">
-                        {filteredAddTalents.map(t => (
-                          <button key={t.id} onClick={() => setAddTalentId(t.id)} className={`w-full text-left p-3 rounded-xl border transition-all flex items-center gap-3 ${addTalentId === t.id ? 'border-blue-500 bg-blue-500/10' : 'border-white/5 hover:border-white/10 bg-zinc-900/30'}`}>
-                            <div className="w-8 h-8 rounded-full bg-zinc-800 overflow-hidden flex-shrink-0">
-                              {t.photoUrl ? <img src={t.photoUrl} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-zinc-600 text-[9px] font-black uppercase">{t.firstName.charAt(0)}{t.lastName.charAt(0)}</div>}
-                            </div>
-                            <span className="text-xs font-black text-white truncate">{t.firstName} {t.lastName}</span>
-                            {addTalentId === t.id && <CheckCircle2 size={14} className="text-blue-500 ml-auto" />}
-                          </button>
-                        ))}
-                      </div>
-
-                      <div>
-                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest block mb-1">Compenso Lordo (€)</label>
-                        <input type="number" min={0} className="w-full bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-3 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none" value={addTalentCompenso || ''} onChange={e => setAddTalentCompenso(Number(e.target.value))} />
-                      </div>
-
-                      <button onClick={handleAddTalentSubmit} disabled={!addTalentId} className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-black uppercase text-[10px] tracking-widest py-3 rounded-xl transition-all">
-                        Aggiungi alla Campagna
-                      </button>
-                    </motion.div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {filteredAddTalents.map(t => (
+                      <GlassCard
+                        key={t.id}
+                        variant="interactive"
+                        hover
+                        onClick={() => setAddTalentId(t.id)}
+                        className={`p-3 flex items-center gap-3 cursor-pointer ${
+                          addTalentId === t.id ? 'border-primary bg-primary/10' : ''
+                        }`}
+                      >
+                        <Avatar className="h-8 w-8">
+                          {t.photoUrl ? (
+                            <AvatarImage src={t.photoUrl} alt={`${t.firstName} ${t.lastName}`} />
+                          ) : null}
+                          <AvatarFallback className="text-[9px]">
+                            {t.firstName.charAt(0)}{t.lastName.charAt(0)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-black text-foreground truncate">{t.firstName} {t.lastName}</span>
+                        {addTalentId === t.id && <CheckCircle2 size={14} className="text-primary ml-auto" />}
+                      </GlassCard>
+                    ))}
                   </div>
-                )}
-              </AnimatePresence>
+
+                  <div>
+                    <Label className="block mb-2">Compenso Lordo (&euro;)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={addTalentCompenso || ''}
+                      onChange={e => setAddTalentCompenso(Number(e.target.value))}
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleAddTalentSubmit}
+                    disabled={!addTalentId}
+                    className="w-full text-[10px] font-black uppercase tracking-widest"
+                  >
+                    Aggiungi alla Campagna
+                  </Button>
+                </DialogContent>
+              </Dialog>
             </div>
           )}
 
@@ -1020,116 +1064,118 @@ const CampaignDetail: React.FC<CampaignDetailProps> = ({ campaignId, onClose }) 
           {activeTab === 'cliente' && (
             <div className="space-y-4">
               {client ? (
-                <div className="bg-zinc-900/30 rounded-2xl border border-white/5 p-6 space-y-4">
+                <GlassCard variant="prominent" className="p-6 space-y-4">
                   <div className="flex items-center gap-3 mb-2">
-                    <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center">
-                      <Building2 size={20} className="text-zinc-500" />
+                    <div className="w-12 h-12 rounded-xl bg-white/[0.06] flex items-center justify-center">
+                      <Building2 size={20} className="text-muted-foreground" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-white">{client.ragione_sociale}</h3>
-                      {client.tipo && <span className="text-[9px] font-black text-zinc-500 uppercase tracking-widest">{client.tipo}</span>}
+                      <h3 className="text-lg font-black text-foreground">{client.ragione_sociale}</h3>
+                      {client.tipo && <Badge variant="glass">{client.tipo}</Badge>}
                     </div>
                   </div>
+
+                  <Separator />
 
                   <div className="grid grid-cols-2 gap-4">
                     {client.referente && (
                       <div>
-                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Referente</p>
-                        <p className="text-sm font-bold text-white">{client.referente}</p>
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Referente</p>
+                        <p className="text-sm font-bold text-foreground">{client.referente}</p>
                       </div>
                     )}
                     {client.email && (
                       <div>
-                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Email</p>
-                        <p className="text-sm font-bold text-white">{client.email}</p>
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Email</p>
+                        <p className="text-sm font-bold text-foreground">{client.email}</p>
                       </div>
                     )}
                     {client.telefono && (
                       <div>
-                        <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Telefono</p>
-                        <p className="text-sm font-bold text-white">{client.telefono}</p>
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Telefono</p>
+                        <p className="text-sm font-bold text-foreground">{client.telefono}</p>
                       </div>
                     )}
                   </div>
 
                   {client.note && (
-                    <div>
-                      <p className="text-[9px] font-black text-zinc-600 uppercase tracking-widest">Note</p>
-                      <p className="text-sm text-zinc-400 whitespace-pre-wrap">{client.note}</p>
-                    </div>
+                    <>
+                      <Separator />
+                      <div>
+                        <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest">Note</p>
+                        <p className="text-sm text-zinc-400 whitespace-pre-wrap">{client.note}</p>
+                      </div>
+                    </>
                   )}
-                </div>
+                </GlassCard>
               ) : (
                 <div className="text-center py-10">
-                  <Building2 size={40} className="mx-auto text-zinc-800 mb-3" />
-                  <p className="text-xs font-black text-zinc-600 uppercase tracking-widest">Nessun cliente associato</p>
+                  <Building2 size={40} className="mx-auto text-muted-foreground/30 mb-3" />
+                  <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Nessun cliente associato</p>
                 </div>
               )}
             </div>
           )}
 
-          {/* Tab: Attività */}
+          {/* Tab: Attivita */}
           {activeTab === 'attivita' && (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="text-sm font-black text-white uppercase tracking-widest">
-                  Attività Collegate ({relatedTasks.length})
+                <h3 className="text-sm font-black text-foreground uppercase tracking-widest">
+                  Attivit&agrave; Collegate ({relatedTasks.length})
                 </h3>
-                <button
-                  onClick={() => setShowNewTask(true)}
-                  className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
-                >
+                <Button onClick={() => setShowNewTask(true)} size="sm" className="gap-1.5 text-[10px] font-black uppercase tracking-widest">
                   <Plus size={14} /> Nuova
-                </button>
+                </Button>
               </div>
 
               {showNewTask && (
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     type="text"
-                    placeholder="Titolo attività..."
-                    className="flex-1 bg-zinc-900/50 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white font-bold focus:border-blue-500/50 focus:outline-none"
+                    placeholder="Titolo attivit&agrave;..."
                     value={newTaskTitle}
                     onChange={e => setNewTaskTitle(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && handleAddTask()}
                     autoFocus
+                    className="flex-1"
                   />
-                  <button onClick={handleAddTask} className="bg-blue-600 hover:bg-blue-700 text-white px-4 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                  <Button onClick={handleAddTask} size="sm" className="text-[10px] font-black uppercase tracking-widest">
                     Aggiungi
-                  </button>
-                  <button onClick={() => { setShowNewTask(false); setNewTaskTitle(''); }} className="p-2 text-zinc-500 hover:text-white">
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => { setShowNewTask(false); setNewTaskTitle(''); }}>
                     <X size={16} />
-                  </button>
+                  </Button>
                 </div>
               )}
 
               {relatedTasks.map(task => (
-                <div key={task.id} className="flex items-center gap-3 p-3 bg-zinc-900/30 rounded-xl border border-white/5 group">
+                <GlassCard key={task.id} className="flex items-center gap-3 p-3 group">
                   <button
                     onClick={() => updateTask(task.id, { status: task.status === TaskStatus.DONE ? TaskStatus.TODO : TaskStatus.DONE })}
-                    className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${task.status === TaskStatus.DONE ? 'bg-emerald-500 border-emerald-500' : 'border-zinc-600 hover:border-blue-500'}`}
+                    className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all ${task.status === TaskStatus.DONE ? 'bg-emerald-500 border-emerald-500' : 'border-white/[0.15] hover:border-primary'}`}
                   >
                     {task.status === TaskStatus.DONE && <CheckCircle2 size={12} className="text-white" />}
                   </button>
-                  <span className={`text-sm font-bold flex-1 ${task.status === TaskStatus.DONE ? 'line-through text-zinc-600' : 'text-white'}`}>
+                  <span className={`text-sm font-bold flex-1 ${task.status === TaskStatus.DONE ? 'line-through text-muted-foreground/50' : 'text-foreground'}`}>
                     {task.title}
                   </span>
                   {task.due_date && (
-                    <span className="text-[10px] text-zinc-500 font-bold">
+                    <span className="text-[10px] text-muted-foreground font-bold">
                       {format(new Date(task.due_date), 'dd MMM', { locale: it })}
                     </span>
                   )}
                   <button
                     onClick={() => deleteTask(task.id)}
-                    className="opacity-0 group-hover:opacity-100 text-zinc-600 hover:text-red-400 transition-all"
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition-all"
                   >
                     <Trash2 size={14} />
                   </button>
-                </div>
+                </GlassCard>
               ))}
 
               {relatedTasks.length === 0 && !showNewTask && (
-                <p className="text-center text-zinc-600 text-xs py-10">Nessuna attività collegata</p>
+                <p className="text-center text-muted-foreground text-xs py-10">Nessuna attivit&agrave; collegata</p>
               )}
             </div>
           )}
@@ -1172,60 +1218,50 @@ const Campaigns: React.FC = () => {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+    <AnimatedContainer className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-white tracking-tighter uppercase">Campagne</h1>
-          <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest mt-1">
-            {campaigns.length} campagne &middot; {campaigns.filter(c => c.status === CampaignStatus.ACTIVE).length} attive
-          </p>
-        </div>
-        <button
-          onClick={() => setShowWizard(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-blue-500/20"
-        >
-          <Plus size={14} />
-          <span>Nuova Campagna</span>
-        </button>
-      </div>
+      <PageHeader
+        title="Campagne"
+        subtitle={`${campaigns.length} campagne \u00b7 ${campaigns.filter(c => c.status === CampaignStatus.ACTIVE).length} attive`}
+        actions={
+          <Button onClick={() => setShowWizard(true)} className="gap-2 text-[10px] font-black uppercase tracking-widest">
+            <Plus size={14} />
+            <span>Nuova Campagna</span>
+          </Button>
+        }
+      />
 
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-3">
-        <div className="flex-1 flex items-center bg-zinc-900/50 border border-white/5 rounded-xl px-4 py-2.5 focus-within:border-blue-500/50 transition-all">
-          <Search size={16} className="text-zinc-600 mr-3" />
-          <input
-            type="text"
-            placeholder="Cerca campagna o cliente..."
-            className="bg-transparent border-none text-xs text-white placeholder-zinc-600 w-full font-bold outline-none"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-          {search && (
-            <button onClick={() => setSearch('')} className="text-zinc-600 hover:text-white">
-              <X size={14} />
-            </button>
-          )}
-        </div>
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder="Cerca campagna o cliente..."
+          className="flex-1"
+        />
 
-        <div className="flex items-center bg-zinc-900/50 p-1 rounded-xl border border-white/5">
+        <div className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-white/[0.03] backdrop-blur-sm p-1 text-muted-foreground border border-white/[0.06]">
           {(['ALL', 'Suono', 'Brand'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTipoFilter(t)}
-              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${tipoFilter === t ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+                tipoFilter === t ? 'bg-white/[0.08] text-foreground shadow-sm border border-white/[0.1]' : 'hover:text-foreground/80'
+              }`}
             >
               {t === 'ALL' ? 'Tutti' : t}
             </button>
           ))}
         </div>
 
-        <div className="flex items-center bg-zinc-900/50 p-1 rounded-xl border border-white/5">
+        <div className="inline-flex h-10 items-center justify-center gap-1 rounded-xl bg-white/[0.03] backdrop-blur-sm p-1 text-muted-foreground border border-white/[0.06]">
           {(['ALL', CampaignStatus.DRAFT, CampaignStatus.ACTIVE, CampaignStatus.CLOSED] as const).map(s => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === s ? 'bg-blue-600 text-white shadow-lg' : 'text-zinc-500 hover:text-white'}`}
+              className={`inline-flex items-center justify-center whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+                statusFilter === s ? 'bg-white/[0.08] text-foreground shadow-sm border border-white/[0.1]' : 'hover:text-foreground/80'
+              }`}
             >
               {s === 'ALL' ? 'Tutte' : s}
             </button>
@@ -1234,19 +1270,19 @@ const Campaigns: React.FC = () => {
       </div>
 
       {/* Campaigns Table */}
-      <div className="bg-[#0c0c0c] border border-white/5 rounded-2xl overflow-hidden">
+      <GlassCard className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-white/5">
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Tipo</th>
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Nome</th>
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Cliente</th>
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Budget</th>
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Stato</th>
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Talent</th>
-                <th className="text-left px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Date</th>
-                <th className="text-right px-5 py-3 text-[9px] font-black text-zinc-600 uppercase tracking-widest">Azioni</th>
+              <tr className="border-b border-white/[0.06]">
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Tipo</th>
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Nome</th>
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Cliente</th>
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Budget</th>
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Stato</th>
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Talent</th>
+                <th className="text-left px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Date</th>
+                <th className="text-right px-5 py-3 text-[9px] font-black text-muted-foreground uppercase tracking-widest">Azioni</th>
               </tr>
             </thead>
             <tbody>
@@ -1260,68 +1296,81 @@ const Campaigns: React.FC = () => {
                   <tr
                     key={campaign.id}
                     onClick={() => setSelectedCampaignId(campaign.id)}
-                    className="border-b border-white/5 hover:bg-zinc-900/30 cursor-pointer transition-all group"
+                    className="border-b border-white/[0.04] hover:bg-white/[0.03] cursor-pointer transition-all group"
                   >
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${campaign.tipo === 'Suono' ? 'bg-purple-500/20 text-purple-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                      <Badge
+                        variant={campaign.tipo === 'Suono' ? 'default' : 'success'}
+                        className={campaign.tipo === 'Suono' ? 'bg-purple-500/15 text-purple-400 border-purple-500/20' : ''}
+                      >
                         {campaign.tipo || 'Brand'}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-black text-white group-hover:text-blue-400 transition-colors">{campaign.name}</p>
+                        <p className="text-sm font-black text-foreground group-hover:text-primary transition-colors">{campaign.name}</p>
                         {(campaign.deadline || campaign.data_fine) && new Date(campaign.deadline || campaign.data_fine!) <= new Date(Date.now() + 2 * 24 * 60 * 60 * 1000) && campaign.status !== CampaignStatus.CLOSED && (
-                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 text-[8px] font-black uppercase tracking-widest border border-red-500/30 animate-pulse">
+                          <Badge variant="destructive" className="gap-1 animate-pulse text-[8px]">
                             <AlertTriangle size={10} /> URGENTE
-                          </span>
+                          </Badge>
                         )}
                       </div>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="text-xs font-bold text-zinc-400">{clientName}</p>
+                      <p className="text-xs font-bold text-muted-foreground">{clientName}</p>
                     </td>
                     <td className="px-5 py-4">
-                      <p className="text-sm font-black text-white">€{campaign.totalBudget.toLocaleString()}</p>
+                      <p className="text-sm font-black text-foreground">&euro;{campaign.totalBudget.toLocaleString()}</p>
                     </td>
                     <td className="px-5 py-4">
-                      <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest ${campaign.status === CampaignStatus.ACTIVE ? 'bg-blue-500/20 text-blue-400' :
-                        campaign.status === CampaignStatus.CLOSED ? 'bg-zinc-700/50 text-zinc-400' : 'bg-amber-500/20 text-amber-400'
-                        }`}>
+                      <Badge variant={
+                        campaign.status === CampaignStatus.ACTIVE ? 'default' :
+                        campaign.status === CampaignStatus.CLOSED ? 'secondary' : 'warning'
+                      }>
                         {campaign.status}
-                      </span>
+                      </Badge>
                     </td>
                     <td className="px-5 py-4">
                       <div className="flex items-center -space-x-1.5">
                         {involvedTalents.slice(0, 3).map(t => (
-                          <div key={t.id} className="w-7 h-7 rounded-full bg-zinc-800 overflow-hidden border-2 border-[#0c0c0c]" title={`${t.firstName} ${t.lastName}`}>
-                            {t.photoUrl ? <img src={t.photoUrl} className="w-full h-full object-cover" alt="" /> : <div className="w-full h-full flex items-center justify-center text-[8px] font-black text-zinc-600">{t.firstName.charAt(0)}{t.lastName.charAt(0)}</div>}
-                          </div>
+                          <Avatar key={t.id} className="h-7 w-7 border-2 border-background" title={`${t.firstName} ${t.lastName}`}>
+                            {t.photoUrl ? (
+                              <AvatarImage src={t.photoUrl} alt={`${t.firstName} ${t.lastName}`} />
+                            ) : null}
+                            <AvatarFallback className="text-[8px]">
+                              {t.firstName.charAt(0)}{t.lastName.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
                         ))}
                         {involvedTalents.length > 3 && (
-                          <div className="w-7 h-7 rounded-full bg-zinc-800 border-2 border-[#0c0c0c] flex items-center justify-center text-[8px] font-bold text-zinc-500">
-                            +{involvedTalents.length - 3}
-                          </div>
+                          <Avatar className="h-7 w-7 border-2 border-background">
+                            <AvatarFallback className="text-[8px]">
+                              +{involvedTalents.length - 3}
+                            </AvatarFallback>
+                          </Avatar>
                         )}
-                        {involvedTalents.length === 0 && <span className="text-zinc-700 text-xs">-</span>}
+                        {involvedTalents.length === 0 && <span className="text-muted-foreground/40 text-xs">-</span>}
                       </div>
                     </td>
                     <td className="px-5 py-4">
                       {campaign.data_inizio ? (
-                        <p className="text-[10px] font-bold text-zinc-500">
+                        <p className="text-[10px] font-bold text-muted-foreground">
                           {format(new Date(campaign.data_inizio), 'dd MMM', { locale: it })}
-                          {campaign.data_fine && ` — ${format(new Date(campaign.data_fine), 'dd MMM', { locale: it })}`}
+                          {campaign.data_fine && ` \u2014 ${format(new Date(campaign.data_fine), 'dd MMM', { locale: it })}`}
                         </p>
                       ) : (
-                        <span className="text-zinc-700 text-xs">-</span>
+                        <span className="text-muted-foreground/40 text-xs">-</span>
                       )}
                     </td>
                     <td className="px-5 py-4 text-right">
-                      <button
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         onClick={(e) => handleDelete(campaign.id, e)}
-                        className="opacity-0 group-hover:opacity-100 p-1.5 text-zinc-600 hover:text-red-400 transition-all"
+                        className="opacity-0 group-hover:opacity-100 h-8 w-8 text-muted-foreground hover:text-red-400"
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -1332,17 +1381,15 @@ const Campaigns: React.FC = () => {
 
         {filteredCampaigns.length === 0 && (
           <div className="py-16 text-center">
-            <Briefcase size={40} className="mx-auto text-zinc-800 mb-3" />
-            <p className="text-xs font-black text-zinc-600 uppercase tracking-widest">Nessuna campagna trovata</p>
-            <p className="text-[10px] text-zinc-700 mt-2">Prova a modificare i filtri o crea una nuova campagna</p>
+            <Briefcase size={40} className="mx-auto text-muted-foreground/20 mb-3" />
+            <p className="text-xs font-black text-muted-foreground uppercase tracking-widest">Nessuna campagna trovata</p>
+            <p className="text-[10px] text-muted-foreground/60 mt-2">Prova a modificare i filtri o crea una nuova campagna</p>
           </div>
         )}
-      </div>
+      </GlassCard>
 
       {/* Wizard Modal */}
-      <AnimatePresence>
-        {showWizard && <CampaignWizard onClose={() => setShowWizard(false)} />}
-      </AnimatePresence>
+      {showWizard && <CampaignWizard onClose={() => setShowWizard(false)} />}
 
       {/* Detail Panel */}
       <AnimatePresence>
@@ -1354,7 +1401,7 @@ const Campaigns: React.FC = () => {
           />
         )}
       </AnimatePresence>
-    </motion.div>
+    </AnimatedContainer>
   );
 };
 

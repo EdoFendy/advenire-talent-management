@@ -1,9 +1,19 @@
 
 import React, { useState, useMemo } from 'react';
-import { Search, Grid, List, Plus, MoreHorizontal, X, Image as ImageIcon, Briefcase, Globe, Phone, Mail, MapPin, Building2, Trash2, Edit3 } from 'lucide-react';
+import { Grid, List, Plus, Globe, Phone, Mail, Briefcase, Trash2, Edit3 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Brand } from '../types';
 import { useApp } from '../context/AppContext';
+import { GlassCard } from '@/components/ui/glass-card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { PageHeader } from '@/components/ui/page-header';
+import { AnimatedContainer } from '@/components/ui/animated-container';
+import { SearchInput } from '@/components/ui/search-input';
+import { staggerContainer, staggerItem } from '@/lib/animations';
 
 interface BrandsProps {
     brands: Brand[];
@@ -89,242 +99,315 @@ const Brands: React.FC<BrandsProps> = ({ brands, addBrand, updateBrand, deleteBr
     };
 
     return (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-10 pb-20">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                <div>
-                    <h1 className="text-4xl font-black text-white tracking-tighter uppercase">Brand & Clienti</h1>
-                    <p className="text-zinc-500 font-medium text-lg">Gestione anagrafica clienti e partnership.</p>
-                </div>
-                <button
-                    onClick={openAddModal}
-                    className="flex items-center space-x-3 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all shadow-xl shadow-blue-500/20 active:scale-95"
-                >
-                    <Plus size={20} />
-                    <span>Nuovo Brand</span>
-                </button>
-            </header>
+        <AnimatedContainer className="space-y-6">
+            {/* Header */}
+            <PageHeader
+                title="Brand & Clienti"
+                subtitle="Gestione anagrafica clienti e partnership"
+                actions={
+                    <Button
+                        onClick={openAddModal}
+                        className="gap-2 font-bold uppercase text-[10px] tracking-widest"
+                    >
+                        <Plus size={14} />
+                        <span>Nuovo Brand</span>
+                    </Button>
+                }
+            />
 
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-zinc-900/40 p-3 rounded-3xl border border-white/5 backdrop-blur-md">
-                <div className="flex items-center bg-zinc-800/80 rounded-2xl px-5 py-3 w-full lg:w-[500px] border border-white/5 focus-within:border-blue-500/50 transition-all">
-                    <Search size={18} className="text-zinc-500 mr-3" />
-                    <input
-                        type="text"
-                        placeholder="Cerca brand, contatto o email..."
-                        className="bg-transparent border-none text-sm focus:ring-0 text-zinc-200 placeholder-zinc-600 w-full font-bold outline-none"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                    />
-                </div>
-
-                <div className="flex items-center space-x-3 bg-zinc-800/50 p-1.5 rounded-2xl border border-white/5">
-                    <button
+            {/* Search + View Toggle */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <SearchInput
+                    value={search}
+                    onChange={setSearch}
+                    placeholder="Cerca brand, contatto o email..."
+                    className="flex-1"
+                />
+                <div className="flex items-center bg-white/[0.02] p-1 rounded-xl border border-white/[0.06]">
+                    <Button
+                        variant={view === 'grid' ? 'default' : 'ghost'}
+                        size="icon"
                         onClick={() => setView('grid')}
-                        className={`p-3 rounded-xl transition-all ${view === 'grid' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-zinc-500 hover:text-white'}`}
+                        className="h-8 w-8"
                     >
-                        <Grid size={20} />
-                    </button>
-                    <button
+                        <Grid size={16} />
+                    </Button>
+                    <Button
+                        variant={view === 'list' ? 'default' : 'ghost'}
+                        size="icon"
                         onClick={() => setView('list')}
-                        className={`p-3 rounded-xl transition-all ${view === 'list' ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20' : 'text-zinc-500 hover:text-white'}`}
+                        className="h-8 w-8"
                     >
-                        <List size={20} />
-                    </button>
+                        <List size={16} />
+                    </Button>
                 </div>
             </div>
 
+            {/* Content */}
             <AnimatePresence mode="popLayout">
                 {view === 'grid' ? (
                     <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"
+                        key="grid"
+                        variants={staggerContainer}
+                        initial="hidden"
+                        animate="show"
+                        exit={{ opacity: 0 }}
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"
                     >
-                        {filteredBrands.map((brand, idx) => (
-                            <motion.div
-                                layoutId={brand.id}
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: idx * 0.05 }}
-                                key={brand.id}
-                                onClick={() => openEditModal(brand)}
-                                className="bg-[#0c0c0c] border border-white/5 rounded-[2.5rem] overflow-hidden group cursor-pointer hover:border-blue-500/50 hover:shadow-[0_32px_64px_-16px_rgba(59,130,246,0.15)] transition-all duration-500 flex flex-col"
-                            >
-                                <div className="h-40 bg-zinc-900/50 relative overflow-hidden flex items-center justify-center p-8">
-                                    <div className="absolute inset-0 bg-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <img
-                                        src={brand.logoUrl || emptyBrand.logoUrl}
-                                        alt={brand.name}
-                                        className="h-24 w-auto object-contain drop-shadow-2xl transition-transform duration-500 group-hover:scale-110"
-                                    />
-                                    <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => handleDelete(brand.id, e)} className="p-2 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all"><Trash2 size={16} /></button>
+                        {filteredBrands.map((brand) => (
+                            <motion.div key={brand.id} variants={staggerItem}>
+                                <GlassCard
+                                    variant="interactive"
+                                    hover
+                                    onClick={() => openEditModal(brand)}
+                                    className="overflow-hidden flex flex-col group"
+                                >
+                                    {/* Logo area */}
+                                    <div className="h-36 bg-white/[0.02] relative overflow-hidden flex items-center justify-center p-6">
+                                        <div className="absolute inset-0 bg-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                                        <img
+                                            src={brand.logoUrl || emptyBrand.logoUrl}
+                                            alt={brand.name}
+                                            className="h-20 w-auto object-contain drop-shadow-2xl transition-transform duration-500 group-hover:scale-110"
+                                        />
+                                        <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button
+                                                variant="destructive"
+                                                size="icon"
+                                                onClick={(e) => handleDelete(brand.id, e)}
+                                                className="h-8 w-8"
+                                            >
+                                                <Trash2 size={14} />
+                                            </Button>
+                                        </div>
                                     </div>
-                                </div>
-                                <div className="p-8 flex-1 flex flex-col">
-                                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter mb-1">{brand.name}</h3>
-                                    {brand.website && (
-                                        <a href={brand.website} target="_blank" rel="noopener noreferrer" className="text-xs font-bold text-blue-500 hover:underline flex items-center mb-4" onClick={e => e.stopPropagation()}>
-                                            <Globe size={12} className="mr-1" /> {brand.website.replace(/^https?:\/\//, '')}
-                                        </a>
-                                    )}
 
-                                    <div className="mt-auto space-y-3 pt-4 border-t border-white/5">
-                                        {brand.contactName && (
-                                            <div className="flex items-center text-zinc-400">
-                                                <Briefcase size={14} className="mr-3 text-zinc-600" />
-                                                <span className="text-xs font-bold">{brand.contactName}</span>
-                                            </div>
+                                    {/* Info area */}
+                                    <div className="p-5 flex-1 flex flex-col">
+                                        <h3 className="text-lg font-bold text-white tracking-tight mb-0.5">{brand.name}</h3>
+                                        {brand.website && (
+                                            <a
+                                                href={brand.website}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] font-bold text-primary hover:underline flex items-center mb-3"
+                                                onClick={e => e.stopPropagation()}
+                                            >
+                                                <Globe size={11} className="mr-1" /> {brand.website.replace(/^https?:\/\//, '')}
+                                            </a>
                                         )}
-                                        {brand.email && (
-                                            <div className="flex items-center text-zinc-400">
-                                                <Mail size={14} className="mr-3 text-zinc-600" />
-                                                <span className="text-xs font-bold truncate">{brand.email}</span>
-                                            </div>
-                                        )}
-                                        {brand.phone && (
-                                            <div className="flex items-center text-zinc-400">
-                                                <Phone size={14} className="mr-3 text-zinc-600" />
-                                                <span className="text-xs font-bold">{brand.phone}</span>
-                                            </div>
-                                        )}
+
+                                        <div className="mt-auto space-y-2 pt-3 border-t border-white/[0.06]">
+                                            {brand.contactName && (
+                                                <div className="flex items-center text-muted-foreground">
+                                                    <Briefcase size={12} className="mr-2.5 text-muted-foreground/60" />
+                                                    <span className="text-[11px] font-semibold">{brand.contactName}</span>
+                                                </div>
+                                            )}
+                                            {brand.email && (
+                                                <div className="flex items-center text-muted-foreground">
+                                                    <Mail size={12} className="mr-2.5 text-muted-foreground/60" />
+                                                    <span className="text-[11px] font-semibold truncate">{brand.email}</span>
+                                                </div>
+                                            )}
+                                            {brand.phone && (
+                                                <div className="flex items-center text-muted-foreground">
+                                                    <Phone size={12} className="mr-2.5 text-muted-foreground/60" />
+                                                    <span className="text-[11px] font-semibold">{brand.phone}</span>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
+                                </GlassCard>
                             </motion.div>
                         ))}
                     </motion.div>
                 ) : (
                     <motion.div
-                        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                        className="bg-[#0c0c0c] border border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl"
+                        key="list"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
                     >
-                        <table className="w-full text-left">
-                            <thead>
-                                <tr className="bg-zinc-900/40 border-b border-white/5 text-[9px] font-black text-zinc-500 uppercase tracking-[0.3em]">
-                                    <th className="px-8 py-6">Brand</th>
-                                    <th className="px-8 py-6">Contatto</th>
-                                    <th className="px-8 py-6">Riferimenti</th>
-                                    <th className="px-8 py-6 text-right">Azioni</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-white/5">
-                                {filteredBrands.map((brand) => (
-                                    <tr key={brand.id} onClick={() => openEditModal(brand)} className="hover:bg-zinc-900/20 cursor-pointer transition-all">
-                                        <td className="px-8 py-6">
-                                            <div className="flex items-center space-x-4">
-                                                <div className="w-12 h-12 bg-white/5 rounded-xl p-2 flex items-center justify-center">
-                                                    <img src={brand.logoUrl || emptyBrand.logoUrl} className="max-w-full max-h-full object-contain" alt="" />
-                                                </div>
-                                                <div>
-                                                    <p className="font-black text-white text-lg">{brand.name}</p>
-                                                    {brand.vat && <p className="text-[10px] text-zinc-500 font-bold uppercase">P.IVA: {brand.vat}</p>}
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6 text-sm font-bold text-zinc-400">
-                                            {brand.contactName || '-'}
-                                        </td>
-                                        <td className="px-8 py-6">
-                                            <div className="space-y-1">
-                                                {brand.email && <div className="flex items-center text-xs font-bold text-zinc-400"><Mail size={12} className="mr-2" /> {brand.email}</div>}
-                                                {brand.phone && <div className="flex items-center text-xs font-bold text-zinc-400"><Phone size={12} className="mr-2" /> {brand.phone}</div>}
-                                            </div>
-                                        </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <div className="flex justify-end space-x-2">
-                                                <button onClick={(e) => { e.stopPropagation(); openEditModal(brand); }} className="p-2 bg-zinc-800 text-zinc-400 rounded-lg hover:text-white hover:bg-zinc-700">
-                                                    <Edit3 size={16} />
-                                                </button>
-                                                <button onClick={(e) => handleDelete(brand.id, e)} className="p-2 bg-zinc-800 text-red-500 rounded-lg hover:bg-red-500/20">
-                                                    <Trash2 size={16} />
-                                                </button>
-                                            </div>
-                                        </td>
+                        <GlassCard className="overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-white/[0.02] border-b border-white/[0.08]">
+                                        <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Brand</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Contatto</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Riferimenti</th>
+                                        <th className="px-6 py-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest text-right">Azioni</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                                </thead>
+                                <tbody className="divide-y divide-white/[0.06]">
+                                    {filteredBrands.map((brand) => (
+                                        <tr key={brand.id} onClick={() => openEditModal(brand)} className="hover:bg-white/[0.02] cursor-pointer transition-all">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center space-x-3">
+                                                    <div className="w-10 h-10 bg-white/[0.04] rounded-xl p-1.5 flex items-center justify-center border border-white/[0.06]">
+                                                        <img src={brand.logoUrl || emptyBrand.logoUrl} className="max-w-full max-h-full object-contain" alt="" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-bold text-white">{brand.name}</p>
+                                                        {brand.vat && <p className="text-[10px] text-muted-foreground font-semibold">P.IVA: {brand.vat}</p>}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-semibold text-muted-foreground">
+                                                {brand.contactName || '-'}
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <div className="space-y-1">
+                                                    {brand.email && <div className="flex items-center text-xs font-semibold text-muted-foreground"><Mail size={12} className="mr-2" /> {brand.email}</div>}
+                                                    {brand.phone && <div className="flex items-center text-xs font-semibold text-muted-foreground"><Phone size={12} className="mr-2" /> {brand.phone}</div>}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex justify-end space-x-1.5">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={(e) => { e.stopPropagation(); openEditModal(brand); }}
+                                                        className="h-8 w-8"
+                                                    >
+                                                        <Edit3 size={14} />
+                                                    </Button>
+                                                    <Button
+                                                        variant="destructive"
+                                                        size="icon"
+                                                        onClick={(e) => handleDelete(brand.id, e)}
+                                                        className="h-8 w-8"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </Button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </GlassCard>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Modal */}
-            <AnimatePresence>
-                {showModal && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setShowModal(false)} className="absolute inset-0 bg-black/90 backdrop-blur-lg" />
-                        <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="relative bg-[#0c0c0c] border border-white/10 rounded-[2.5rem] w-full max-w-2xl overflow-hidden p-8 shadow-2xl">
-                            <div className="flex justify-between items-center mb-8">
-                                <h3 className="text-3xl font-black text-white uppercase tracking-tighter">{editingBrand ? 'Modifica Brand' : 'Nuovo Brand'}</h3>
-                                <button onClick={() => setShowModal(false)} className="p-2 hover:bg-zinc-900 rounded-xl transition-all text-zinc-500 hover:text-white"><X size={24} /></button>
+            {/* Empty state */}
+            {filteredBrands.length === 0 && (
+                <div className="py-20 text-center">
+                    <Plus size={48} className="mx-auto text-white/[0.06] mb-4" />
+                    <p className="text-sm font-semibold text-muted-foreground uppercase tracking-widest">Nessun brand trovato</p>
+                    <p className="text-xs text-muted-foreground mt-2">Prova a modificare la ricerca o aggiungi un nuovo brand</p>
+                </div>
+            )}
+
+            {/* Add/Edit Modal */}
+            <Dialog open={showModal} onOpenChange={setShowModal}>
+                <DialogContent className="max-w-2xl p-8">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold uppercase tracking-tight">
+                            {editingBrand ? 'Modifica Brand' : 'Nuovo Brand'}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* Logo preview + URL */}
+                        <div className="flex items-center space-x-4">
+                            <div className="w-16 h-16 bg-white/[0.04] rounded-2xl border border-white/[0.08] flex items-center justify-center p-2 overflow-hidden">
+                                <img src={formData.logoUrl} alt="" className="w-full h-full object-contain" />
                             </div>
+                            <div className="flex-1 space-y-1.5">
+                                <Label>Logo URL</Label>
+                                <Input
+                                    type="url"
+                                    value={formData.logoUrl}
+                                    onChange={e => setFormData({ ...formData, logoUrl: e.target.value })}
+                                    placeholder="Rate it!"
+                                />
+                            </div>
+                        </div>
 
-                            <form onSubmit={handleSubmit} className="space-y-6">
-                                <div className="space-y-4">
-                                    <div className="flex items-center space-x-4">
-                                        <div className="w-20 h-20 bg-zinc-900 rounded-2xl border border-white/10 flex items-center justify-center p-2 overflow-hidden">
-                                            <img src={formData.logoUrl} alt="" className="w-full h-full object-contain" />
-                                        </div>
-                                        <div className="flex-1 space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Logo URL</label>
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="url"
-                                                    className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500"
-                                                    value={formData.logoUrl}
-                                                    onChange={e => setFormData({ ...formData, logoUrl: e.target.value })}
-                                                    placeholder="Rate it!"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label>Nome Brand *</Label>
+                                <Input
+                                    type="text"
+                                    required
+                                    value={formData.name}
+                                    onChange={e => setFormData({ ...formData, name: e.target.value })}
+                                    placeholder="Es. Nike"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Referente</Label>
+                                <Input
+                                    type="text"
+                                    value={formData.contactName}
+                                    onChange={e => setFormData({ ...formData, contactName: e.target.value })}
+                                    placeholder="Es. Mario Rossi"
+                                />
+                            </div>
+                        </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Nome Brand *</label>
-                                            <input type="text" required className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500" value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} placeholder="Es. Nike" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Referente</label>
-                                            <input type="text" className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500" value={formData.contactName} onChange={e => setFormData({ ...formData, contactName: e.target.value })} placeholder="Es. Mario Rossi" />
-                                        </div>
-                                    </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label>Email</Label>
+                                <Input
+                                    type="email"
+                                    value={formData.email}
+                                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Telefono</Label>
+                                <Input
+                                    type="tel"
+                                    value={formData.phone}
+                                    onChange={e => setFormData({ ...formData, phone: e.target.value })}
+                                />
+                            </div>
+                        </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Email</label>
-                                            <input type="email" className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500" value={formData.email} onChange={e => setFormData({ ...formData, email: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Telefono</label>
-                                            <input type="tel" className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500" value={formData.phone} onChange={e => setFormData({ ...formData, phone: e.target.value })} />
-                                        </div>
-                                    </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1.5">
+                                <Label>Sito Web</Label>
+                                <Input
+                                    type="url"
+                                    value={formData.website}
+                                    onChange={e => setFormData({ ...formData, website: e.target.value })}
+                                    placeholder="https://"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>P.IVA</Label>
+                                <Input
+                                    type="text"
+                                    value={formData.vat}
+                                    onChange={e => setFormData({ ...formData, vat: e.target.value })}
+                                />
+                            </div>
+                        </div>
 
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Sito Web</label>
-                                            <input type="url" className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500" value={formData.website} onChange={e => setFormData({ ...formData, website: e.target.value })} placeholder="https://" />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">P.IVA</label>
-                                            <input type="text" className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500" value={formData.vat} onChange={e => setFormData({ ...formData, vat: e.target.value })} />
-                                        </div>
-                                    </div>
+                        <div className="space-y-1.5">
+                            <Label>Note</Label>
+                            <Textarea
+                                rows={3}
+                                value={formData.notes}
+                                onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                placeholder="Informazioni aggiuntive..."
+                            />
+                        </div>
 
-                                    <div className="space-y-2">
-                                        <label className="text-[10px] font-black text-zinc-500 uppercase tracking-widest ml-1">Note</label>
-                                        <textarea rows={3} className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white font-bold text-sm focus:outline-none focus:border-blue-500 resize-none" value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} placeholder="Informazioni aggiuntive..." />
-                                    </div>
-                                </div>
-
-                                <button type="submit" disabled={isSubmitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black uppercase text-xs tracking-widest py-5 rounded-2xl transition-all shadow-xl shadow-blue-500/20 active:scale-95 disabled:opacity-50">
-                                    {isSubmitting ? 'Salvataggio...' : (editingBrand ? 'Salva Modifiche' : 'Crea Brand')}
-                                </button>
-                            </form>
-                        </motion.div>
-                    </div>
-                )}
-            </AnimatePresence>
-        </motion.div>
+                        <Button
+                            type="submit"
+                            disabled={isSubmitting}
+                            className="w-full font-bold uppercase text-[10px] tracking-widest py-4 mt-2"
+                        >
+                            {isSubmitting ? 'Salvataggio...' : (editingBrand ? 'Salva Modifiche' : 'Crea Brand')}
+                        </Button>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </AnimatedContainer>
     );
 };
 
