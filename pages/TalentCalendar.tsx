@@ -2,16 +2,17 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import {
     format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
-    addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth
+    addMonths, subMonths, startOfWeek, endOfWeek, isSameMonth, addDays
 } from 'date-fns';
 import { it } from 'date-fns/locale';
 import {
     ChevronLeft, ChevronRight, Calendar as CalendarIcon,
     Video, Camera, Truck, MessageSquare,
-    Briefcase, Bell, Clock, Flag
+    Briefcase, Bell, Clock, Flag, AlertTriangle,
+    CheckSquare, MapPin
 } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { AppointmentType } from '../types';
+import { AppointmentType, CampaignTalentStatus } from '../types';
 import { useApp } from '../context/AppContext';
 
 import { GlassCard } from '@/components/ui/glass-card';
@@ -29,17 +30,18 @@ interface TalentCalendarProps {
 interface CalendarItem {
     id: string;
     title: string;
-    itemType: 'appointment' | 'campaign' | 'deadline';
+    itemType: 'appointment' | 'campaign' | 'task' | 'urgency';
     description?: string;
     location?: string;
     status?: string;
     appointmentType?: AppointmentType;
     campaignLabel?: string;
     brand?: string;
+    priority?: string;
 }
 
 const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
-    const { campaignTalents, campaigns, appointments } = useApp();
+    const { campaignTalents, campaigns, appointments, tasks } = useApp();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDay, setSelectedDay] = useState<Date | null>(null);
 
@@ -57,6 +59,15 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
         appointments.filter(a => a.talentId === talentId),
         [appointments, talentId]);
 
+    // My tasks (assigned to this talent, with due_date)
+    const myTasks = useMemo(() =>
+        tasks.filter(t => t.assigned_talent_id === talentId && t.due_date && t.status !== 'done'),
+        [tasks, talentId]);
+
+    // Urgenze: deadline imminenti + campagne in attesa di conferma
+    const today = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+    const twoDaysFromNow = useMemo(() => format(addDays(new Date(), 2), 'yyyy-MM-dd'), []);
+
     // Calendar grid days
     const monthCalendarDays = useMemo(() => {
         const monthStart = startOfMonth(currentDate);
@@ -72,7 +83,8 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
 
     const getTypeIcon = (itemType: string, appointmentType?: AppointmentType) => {
         if (itemType === 'campaign') return <Briefcase size={12} />;
-        if (itemType === 'deadline') return <Flag size={12} />;
+        if (itemType === 'urgency') return <AlertTriangle size={12} />;
+        if (itemType === 'task') return <CheckSquare size={12} />;
         switch (appointmentType) {
             case AppointmentType.SHOOTING: return <Camera size={12} />;
             case AppointmentType.PUBLICATION: return <Video size={12} />;
@@ -86,7 +98,36 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
         const dayStr = format(day, 'yyyy-MM-dd');
         const items: CalendarItem[] = [];
 
-        // Appointments
+        // Urgenze: deadline imminenti (entro 2 giorni) + campagne in attesa conferma
+        // Campaign deadlines within 2 days
+        myCampaigns.forEach(c => {
+            if (c.deadline === dayStr && c.deadline <= twoDaysFromNow && c.deadline >= today) {
+                items.push({
+                    id: `urg-dl-${c.id}`,
+                    title: c.name,
+                    itemType: 'urgency',
+                    description: `Deadline imminente${c.brand ? ` - ${c.brand}` : ''}`,
+                    brand: c.brand || c.name,
+                });
+            }
+        });
+        // Pending campaign confirmations (show on today)
+        if (dayStr === today) {
+            myCampaignTalents.forEach(ct => {
+                if (ct.stato === CampaignTalentStatus.PENDING) {
+                    const camp = campaigns.find(c => c.id === ct.campaign_id);
+                    items.push({
+                        id: `urg-pending-${ct.id}`,
+                        title: camp?.name || ct.campaign_name || 'Campagna',
+                        itemType: 'urgency',
+                        description: 'In attesa di conferma',
+                        brand: camp?.brand || camp?.name || '',
+                    });
+                }
+            });
+        }
+
+        // Appuntamenti
         myAppointments.forEach(app => {
             if (app.date === dayStr) {
                 items.push({
@@ -100,18 +141,9 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                     brand: app.brand,
                 });
             }
-            if (app.deadline && app.deadline === dayStr) {
-                items.push({
-                    id: `app-dl-${app.id}`,
-                    title: `Deadline: ${app.brand}`,
-                    itemType: 'deadline',
-                    description: `Scadenza ${app.type}`,
-                    brand: app.brand,
-                });
-            }
         });
 
-        // Campaign events
+        // Campagne (inizio, fine, deadline non-urgenti)
         myCampaigns.forEach(c => {
             if (c.data_inizio === dayStr) {
                 items.push({
@@ -133,11 +165,12 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                     brand: c.brand || c.name,
                 });
             }
-            if (c.deadline === dayStr) {
+            // Deadline campagna (non urgente = oltre 2 giorni)
+            if (c.deadline === dayStr && !(c.deadline <= twoDaysFromNow && c.deadline >= today)) {
                 items.push({
                     id: `camp-dl-${c.id}`,
-                    title: `Deadline: ${c.name}`,
-                    itemType: 'deadline',
+                    title: c.name,
+                    itemType: 'campaign',
                     campaignLabel: 'Deadline',
                     description: c.brand ? `Deadline - ${c.brand}` : 'Deadline campagna',
                     brand: c.brand || c.name,
@@ -145,29 +178,46 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
             }
         });
 
+        // Attività (tasks con due_date)
+        myTasks.forEach(t => {
+            if (t.due_date === dayStr) {
+                items.push({
+                    id: `task-${t.id}`,
+                    title: t.title,
+                    itemType: 'task',
+                    description: t.description,
+                    priority: t.priority,
+                    status: t.status,
+                });
+            }
+        });
+
         return items;
-    }, [myAppointments, myCampaigns]);
+    }, [myAppointments, myCampaigns, myTasks, myCampaignTalents, campaigns, today, twoDaysFromNow]);
 
     const getItemColor = (itemType: string) => {
         switch (itemType) {
             case 'appointment': return { bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary' };
             case 'campaign': return { bg: 'bg-purple-500/10', border: 'border-purple-500', text: 'text-purple-400' };
-            case 'deadline': return { bg: 'bg-destructive/10', border: 'border-destructive', text: 'text-destructive' };
+            case 'task': return { bg: 'bg-amber-500/10', border: 'border-amber-500', text: 'text-amber-400' };
+            case 'urgency': return { bg: 'bg-destructive/10', border: 'border-destructive', text: 'text-destructive' };
             default: return { bg: 'bg-primary/10', border: 'border-primary', text: 'text-primary' };
         }
     };
 
-    const getBadgeVariant = (itemType: string): "default" | "destructive" | "secondary" => {
+    const getBadgeVariant = (itemType: string): "default" | "destructive" | "secondary" | "warning" => {
         switch (itemType) {
             case 'appointment': return 'default';
             case 'campaign': return 'secondary';
-            case 'deadline': return 'destructive';
+            case 'task': return 'warning';
+            case 'urgency': return 'destructive';
             default: return 'default';
         }
     };
 
     const getBadgeLabel = (item: CalendarItem) => {
-        if (item.itemType === 'deadline') return 'Deadline';
+        if (item.itemType === 'urgency') return 'Urgente';
+        if (item.itemType === 'task') return 'Attività';
         if (item.itemType === 'campaign') return item.campaignLabel || 'Campagna';
         return item.appointmentType || 'Appuntamento';
     };
@@ -177,7 +227,7 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
             {/* Header */}
             <PageHeader
                 title="Il Mio Calendario"
-                subtitle="Gestione campagne, scadenze e appuntamenti"
+                subtitle="Appuntamenti, campagne, attività e urgenze"
                 actions={
                     <div className="flex items-center gap-3">
                         <Button
@@ -264,7 +314,7 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                                     </span>
                                     {dayItems.length > 0 && currentMonth && (
                                         <div className="flex gap-1">
-                                            {dayItems.some(i => i.itemType === 'deadline') && (
+                                            {dayItems.some(i => i.itemType === 'urgency') && (
                                                 <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
                                             )}
                                             {dayItems.some(i => i.itemType === 'campaign') && (
@@ -272,6 +322,9 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                                             )}
                                             {dayItems.some(i => i.itemType === 'appointment') && (
                                                 <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                            )}
+                                            {dayItems.some(i => i.itemType === 'task') && (
+                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-500" />
                                             )}
                                         </div>
                                     )}
@@ -315,8 +368,12 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Campagne</span>
                 </div>
                 <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-amber-500" />
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Attività</span>
+                </div>
+                <div className="flex items-center gap-2">
                     <div className="w-2.5 h-2.5 rounded-full bg-destructive" />
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Deadline</span>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Urgenze</span>
                 </div>
             </GlassCard>
 
@@ -335,10 +392,17 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                     <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
                         {selectedDay && getDayItems(selectedDay).map((item) => {
                             const colors = getItemColor(item.itemType);
+                            const cardAccent = item.itemType === 'urgency'
+                                ? 'border-destructive/20 bg-destructive/[0.04]'
+                                : item.itemType === 'campaign'
+                                ? 'border-purple-500/20 bg-purple-500/[0.04]'
+                                : item.itemType === 'task'
+                                ? 'border-amber-500/20 bg-amber-500/[0.04]'
+                                : '';
                             return (
                                 <GlassCard
                                     key={item.id}
-                                    className={`p-5 ${item.itemType === 'deadline' ? 'border-destructive/20 bg-destructive/[0.04]' : item.itemType === 'campaign' ? 'border-purple-500/20 bg-purple-500/[0.04]' : ''}`}
+                                    className={`p-5 ${cardAccent}`}
                                 >
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
@@ -346,6 +410,11 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                                                 <Badge variant={getBadgeVariant(item.itemType)}>
                                                     {getBadgeLabel(item)}
                                                 </Badge>
+                                                {item.priority && item.priority !== 'normal' && (
+                                                    <Badge variant={item.priority === 'urgent' ? 'destructive' : item.priority === 'high' ? 'warning' : 'secondary'} className="text-[8px]">
+                                                        {item.priority === 'urgent' ? 'Urgente' : item.priority === 'high' ? 'Alta' : 'Bassa'}
+                                                    </Badge>
+                                                )}
                                             </div>
                                             <h4 className="text-lg font-black text-foreground tracking-tight">
                                                 {item.brand || item.title}
@@ -365,14 +434,22 @@ const TalentCalendar: React.FC<TalentCalendarProps> = ({ talentId }) => {
                                     <div className="flex items-center gap-4">
                                         {item.location && (
                                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                                                <Truck size={12} className="text-primary" />
+                                                <MapPin size={12} className="text-primary" />
                                                 <span>{item.location}</span>
                                             </div>
                                         )}
                                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground">
-                                            <Bell size={12} className={item.itemType === 'deadline' ? 'text-destructive' : item.itemType === 'campaign' ? 'text-purple-400' : 'text-muted-foreground'} />
+                                            <Bell size={12} className={
+                                                item.itemType === 'urgency' ? 'text-destructive'
+                                                : item.itemType === 'campaign' ? 'text-purple-400'
+                                                : item.itemType === 'task' ? 'text-amber-400'
+                                                : 'text-muted-foreground'
+                                            } />
                                             <span className="uppercase tracking-widest">
-                                                {item.itemType === 'deadline' ? 'Scadenza' : item.itemType === 'campaign' ? (item.campaignLabel || 'Campagna') : 'Pianificato'}
+                                                {item.itemType === 'urgency' ? 'Urgente'
+                                                : item.itemType === 'campaign' ? (item.campaignLabel || 'Campagna')
+                                                : item.itemType === 'task' ? 'Attività'
+                                                : 'Pianificato'}
                                             </span>
                                         </div>
                                     </div>
